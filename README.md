@@ -1,4 +1,4 @@
 Chinese-Whispers
 ================
 
-A generic UDP based gossip replication system
+A generic UDP based state replication service
