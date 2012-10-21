@@ -150,7 +150,7 @@ public class GossipTest extends TestCase {
 
             @Override
             protected void notifyUpdate(ReplicatedState state) {
-                receiver.receive(state.getState());
+                receiver.update(state.getState());
             }
         };
 
@@ -186,8 +186,8 @@ public class GossipTest extends TestCase {
 
         verify(communications).setGossip(gossip);
 
-        verify(receiver).receive(state1.getState());
-        verify(receiver).receive(state3.getState());
+        verify(receiver).update(state1.getState());
+        verify(receiver).update(state3.getState());
         verifyNoMoreInteractions(communications);
     }
 

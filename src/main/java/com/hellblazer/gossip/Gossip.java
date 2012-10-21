@@ -216,7 +216,7 @@ public class Gossip {
         Endpoint state = endpoints.get(endpoint);
         if (state != null && state.getTime() > time) {
             if (log.isTraceEnabled()) {
-                log.trace(format("local  time stamp %s greater than %s for %s ",
+                log.trace(format("local time stamp %s greater than %s for %s ",
                                  state.getTime(), time, endpoint));
             }
             deltaState.add(state.getState());
@@ -233,7 +233,7 @@ public class Gossip {
             InetSocketAddress endpoint = remoteState.getAddress();
             if (endpoint == null) {
                 if (log.isDebugEnabled()) {
-                    log.debug(String.format("endpoint  address is null: "
+                    log.debug(String.format("endpoint address is null: "
                                             + remoteState));
                 }
                 continue;
@@ -252,7 +252,7 @@ public class Gossip {
                     local.record(remoteState);
                     notifyUpdate(local.getState());
                     if (log.isTraceEnabled()) {
-                        log.trace(format("Updating  state time stamp to %s from %s for %s",
+                        log.trace(format("Updating state time stamp to %s from %s for %s",
                                          local.getTime(), oldTime, endpoint));
                     }
                 }
@@ -269,21 +269,22 @@ public class Gossip {
         }
         for (Iterator<Entry<InetSocketAddress, Endpoint>> iterator = endpoints.entrySet().iterator(); iterator.hasNext();) {
             Entry<InetSocketAddress, Endpoint> entry = iterator.next();
-            InetSocketAddress endpoint = entry.getKey();
-            if (endpoint.equals(view.getLocalAddress())) {
+            InetSocketAddress address = entry.getKey();
+            if (address.equals(view.getLocalAddress())) {
                 continue;
             }
 
-            Endpoint state = entry.getValue();
-            if (state.isAlive() && state.shouldConvict(now)) {
+            Endpoint endpoint = entry.getValue();
+            if (endpoint.isAlive() && endpoint.shouldConvict(now)) {
                 iterator.remove();
-                state.markDead();
-                view.markDead(endpoint, now);
+                endpoint.markDead();
+                view.markDead(address, now);
                 if (log.isDebugEnabled()) {
                     log.debug(format("Endpoint %s is now DEAD on node: %s",
-                                     state.getState().getId(),
+                                     endpoint.getState().getId(),
                                      localState.get().getId()));
                 }
+                notifyAbandon(endpoint.getState());
             }
         }
         if (log.isTraceEnabled()) {
@@ -385,7 +386,7 @@ public class Gossip {
                     log.debug(format("Member %s is now UP",
                                      endpoint.getState().getId()));
                 }
-                notifyUpdate(endpoint.getState());
+                notifyDiscover(endpoint.getState());
             }
 
         };
@@ -553,6 +554,49 @@ public class Gossip {
         return null;
     }
 
+    /**
+     * @param state
+     */
+    protected void notifyAbandon(final ReplicatedState state) {
+        assert state != null;
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("Member: %s notifying abandonment of: %s",
+                                    getId(), state));
+        }
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                listener.abandon(state.getState());
+            }
+        });
+        ring.send(state);
+    }
+
+    /**
+     * @param state
+     */
+    protected void notifyDiscover(final ReplicatedState state) {
+        assert state != null;
+        if (isIgnoring(state.getId())) {
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("Member: %s discarding notification of: %s",
+                                        getId(), state));
+            }
+            return;
+        }
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("Member: %s notifying discovery of: %s",
+                                    getId(), state));
+        }
+        dispatcher.execute(new Runnable() {
+            @Override
+            public void run() {
+                listener.discover(state.getState());
+            }
+        });
+        ring.send(state);
+    }
+
     protected void notifyUpdate(final ReplicatedState state) {
         assert state != null;
         if (isIgnoring(state.getId())) {
@@ -569,7 +613,7 @@ public class Gossip {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                listener.receive(state.getState());
+                listener.update(state.getState());
             }
         });
         ring.send(state);
@@ -625,12 +669,6 @@ public class Gossip {
             }
             gossipHandler.update(deltaState);
         }
-    }
-
-    protected boolean shouldConvict(InetSocketAddress address, long now) {
-        Endpoint endpoint = endpoints.get(address);
-        return endpoint == null || isIgnoring(endpoint.getState().getId())
-               || endpoint.shouldConvict(now);
     }
 
     protected void sort(List<Digest> digests) {

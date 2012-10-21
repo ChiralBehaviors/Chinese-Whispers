@@ -31,5 +31,24 @@ package com.hellblazer.gossip;
  * 
  */
 public interface GossipListener {
-    void receive(byte[] state);
+    /**
+     * The state is newly discovered
+     * 
+     * @param state
+     */
+    void discover(byte[] state);
+
+    /**
+     * Previously known state has been updated
+     * 
+     * @param state
+     */
+    void update(byte[] state);
+
+    /**
+     * Previously known state has been abandoned
+     * 
+     * @param state
+     */
+    void abandon(byte[] state);
 }

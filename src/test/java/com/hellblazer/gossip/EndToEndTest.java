@@ -59,6 +59,14 @@ public class EndToEndTest extends TestCase {
             setLatches(id);
         }
 
+        /* (non-Javadoc)
+         * @see com.hellblazer.gossip.GossipListener#abandon(byte[])
+         */
+        @Override
+        public void abandon(byte[] state) {
+            throw new IllegalStateException("Should never have abandoned");
+        }
+
         public void await(int timeout, TimeUnit unit)
                                                      throws InterruptedException {
             for (CountDownLatch latche : latches) {
@@ -66,8 +74,25 @@ public class EndToEndTest extends TestCase {
             }
         }
 
+        /* (non-Javadoc)
+         * @see com.hellblazer.gossip.GossipListener#discover(byte[])
+         */
         @Override
-        public void receive(byte[] state) {
+        public void discover(byte[] state) {
+            // System.out.println("Heartbeat received: " + hb);
+            int currentCount = count.incrementAndGet();
+            if (currentCount % 100 == 0) {
+                System.out.print('.');
+            } else if (currentCount % 1000 == 0) {
+                System.out.println();
+            }
+
+            ByteBuffer buffer = ByteBuffer.wrap(state);
+            latches[buffer.getInt()].countDown();
+        }
+
+        @Override
+        public void update(byte[] state) {
             assert state != null;
             // System.out.println("Heartbeat received: " + hb);
             int currentCount = count.incrementAndGet();
