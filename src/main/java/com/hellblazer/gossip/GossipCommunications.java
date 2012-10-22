@@ -58,7 +58,7 @@ public interface GossipCommunications {
      * @param state
      * @param inetSocketAddress
      */
-    void update(ReplicatedState state, InetSocketAddress inetSocketAddress);
+    void update(Update state, InetSocketAddress inetSocketAddress);
 
     /**
      * Set the gossip service

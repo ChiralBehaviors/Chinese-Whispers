@@ -30,8 +30,7 @@ public class Ring {
     private static final Logger                      log      = LoggerFactory.getLogger(Ring.class.getCanonicalName());
 
     public Ring(InetSocketAddress address, GossipCommunications comms) {
-        endpoint = new Endpoint(address, new ReplicatedState(null, null, null),
-                                null);
+        endpoint = new Endpoint(address, new ReplicatedState(null, null), null);
         this.comms = comms;
     }
 
@@ -40,7 +39,7 @@ public class Ring {
      * 
      * @param state
      */
-    public void send(ReplicatedState state) {
+    public void send(Update state) {
         InetSocketAddress target = neighbor.get();
         if (target != null) {
             comms.update(state, target);
@@ -70,9 +69,9 @@ public class Ring {
         }
         SortedSet<Endpoint> head = members.headSet(endpoint);
         if (!head.isEmpty()) {
-            neighbor.set(head.last().getState().getAddress());
+            neighbor.set(head.last().getAddress());
         } else {
-            neighbor.set(members.last().getState().getAddress());
+            neighbor.set(members.last().getAddress());
         }
     }
 }

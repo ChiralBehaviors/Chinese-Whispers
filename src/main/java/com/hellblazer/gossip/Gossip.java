@@ -190,15 +190,14 @@ public class Gossip {
      * @param id
      */
     public void deregister(UUID id) {
-        ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
-                                                    new byte[0]);
+        ReplicatedState state = new ReplicatedState(id, new byte[0]);
         state.setTime(System.currentTimeMillis());
         localState.set(state);
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s abandoning replicated state",
                                     getLocalAddress()));
         }
-        ring.send(state);
+        ring.send(new Update(getLocalAddress(), state));
     }
 
     public InetSocketAddress getLocalAddress() {
@@ -213,15 +212,14 @@ public class Gossip {
      */
     public UUID register(byte[] replicatedState) {
         UUID id = idGenerator.generate();
-        ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
-                                                    replicatedState);
+        ReplicatedState state = new ReplicatedState(id, replicatedState);
         state.setTime(System.currentTimeMillis());
         localState.set(state);
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s registering replicated state",
                                     getLocalAddress()));
         }
-        ring.send(state);
+        ring.send(new Update(getLocalAddress(), state));
         return id;
     }
 
@@ -256,8 +254,7 @@ public class Gossip {
      * @param replicatedState
      */
     public void update(UUID id, byte[] replicatedState) {
-        ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
-                                                    replicatedState);
+        ReplicatedState state = new ReplicatedState(id, replicatedState);
         state.setTime(System.currentTimeMillis());
         localState.set(state);
         if (log.isDebugEnabled()) {
@@ -265,22 +262,21 @@ public class Gossip {
                                     getLocalAddress()));
         }
         ring.update(endpoints.values());
-        ring.send(state);
+        ring.send(new Update(getLocalAddress(), state));
     }
 
-    protected void addUpdatedState(List<ReplicatedState> deltaState,
-                                   InetSocketAddress endpoint, long time) {
-        Endpoint state = endpoints.get(endpoint);
-        if (state != null && state.getTime() > time) {
+    protected void addUpdatedState(List<Update> deltaState, Digest digest) {
+        Endpoint endpoint = endpoints.get(digest.getAddress());
+        if (endpoint != null && endpoint.getTime() > digest.getTime()) {
             if (log.isTraceEnabled()) {
                 log.trace(format("local time stamp %s greater than %s for %s ",
-                                 state.getTime(), time, endpoint));
+                                 endpoint.getTime(), digest.getTime(), digest));
             }
-            deltaState.add(state.getState());
+            deltaState.add(new Update(digest.getAddress(), endpoint.getState()));
         } else {
-            if (view.getLocalAddress().equals(endpoint)
-                && localState.get().getTime() > time) {
-                deltaState.add(localState.get());
+            if (view.getLocalAddress().equals(digest.getAddress())
+                && localState.get().getTime() > digest.getTime()) {
+                deltaState.add(new Update(digest.getAddress(), localState.get()));
             }
         }
     }
@@ -357,9 +353,7 @@ public class Gossip {
      */
     protected void connectAndGossipWith(final InetSocketAddress address,
                                         final List<Digest> digests) {
-        final Endpoint newEndpoint = new Endpoint(address,
-                                                  new ReplicatedState(address),
-                                                  fdFactory.create());
+        final Endpoint newEndpoint = new Endpoint(address, fdFactory.create());
         Runnable connectAction = new Runnable() {
             @Override
             public void run() {
@@ -388,16 +382,16 @@ public class Gossip {
     /**
      * Discover a connection with a previously unconnected member
      * 
-     * @param remoteState
+     * @param update
      *            - the state from a previously unconnected member of the system
      *            view
      */
-    protected void discover(final ReplicatedState remoteState) {
-        final InetSocketAddress address = remoteState.getAddress();
+    protected void discover(final Update update) {
+        final InetSocketAddress address = update.node;
         if (view.getLocalAddress().equals(address)) {
             return; // it's our state, dummy
         }
-        final Endpoint endpoint = new Endpoint(address, remoteState,
+        final Endpoint endpoint = new Endpoint(address, update.state,
                                                fdFactory.create());
         Runnable connectAction = new Runnable() {
             @Override
@@ -429,7 +423,7 @@ public class Gossip {
                                     getLocalAddress(), digests));
         }
         List<Digest> deltaDigests = new ArrayList<Digest>();
-        List<ReplicatedState> deltaState = new ArrayList<ReplicatedState>();
+        List<Update> deltaState = new ArrayList<Update>();
         for (Digest digest : digests) {
             long remoteTime = digest.getTime();
             Endpoint state = endpoints.get(digest.getAddress());
@@ -441,11 +435,11 @@ public class Gossip {
                 if (remoteTime > localTime) {
                     deltaDigests.add(new Digest(digest.getAddress(), localTime));
                 } else if (remoteTime < localTime) {
-                    addUpdatedState(deltaState, digest.getAddress(), remoteTime);
+                    addUpdatedState(deltaState, digest);
                 }
             } else {
                 if (view.getLocalAddress().equals(digest.getAddress())) {
-                    addUpdatedState(deltaState, digest.getAddress(), remoteTime);
+                    addUpdatedState(deltaState, digest);
                 } else {
                     deltaDigests.add(new Digest(digest.getAddress(), -1));
                 }
@@ -598,11 +592,10 @@ public class Gossip {
                     listener.deregister(state.getId());
                 } catch (Throwable e) {
                     log.warn(String.format("exception notifying listener of deregistration of state %s",
-                                           state.getAddress()));
+                                           state.getId()));
                 }
             }
         });
-        ring.send(state);
     }
 
     /**
@@ -625,7 +618,6 @@ public class Gossip {
                 }
             }
         });
-        ring.send(state);
     }
 
     protected void notifyUpdate(final ReplicatedState state) {
@@ -645,7 +637,6 @@ public class Gossip {
                 }
             }
         });
-        ring.send(state);
     }
 
     protected List<Digest> randomDigests() {
@@ -685,10 +676,9 @@ public class Gossip {
         }
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
-        List<ReplicatedState> deltaState = new ArrayList();
+        List<Update> deltaState = new ArrayList();
         for (Digest digest : digests) {
-            InetSocketAddress addr = digest.getAddress();
-            addUpdatedState(deltaState, addr, digest.getTime());
+            addUpdatedState(deltaState, digest);
         }
         if (!deltaState.isEmpty()) {
             if (log.isTraceEnabled()) {
@@ -704,9 +694,10 @@ public class Gossip {
      * applied, continue sending the state around the ring
      * 
      * @param state
+     * @param gossiper
      */
-    protected void ringUpdate(ReplicatedState state) {
-        if (update(state)) {
+    protected void ringUpdate(Update state, InetSocketAddress gossiper) {
+        if (update(state, gossiper)) {
             ring.send(state);
         }
     }
@@ -742,35 +733,35 @@ public class Gossip {
      * the gossip protocol. The supplied state is the updated state requested by
      * the receiver in response to the digests in the original gossip message.
      * 
-     * @param remoteState
+     * @param update
      *            - the updated state requested from our partner
+     * @param gossiper
      * @return true if the state was applied, false otherwise
      */
-    protected boolean update(ReplicatedState remoteState) {
+    protected boolean update(Update update, InetSocketAddress gossiper) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving update state: %s",
-                                    getLocalAddress(), remoteState));
+                                    getLocalAddress(), update));
         }
-        InetSocketAddress endpoint = remoteState.getAddress();
+        InetSocketAddress endpoint = update.node;
         if (endpoint == null) {
             if (log.isDebugEnabled()) {
-                log.debug(String.format("endpoint address is null: "
-                                        + remoteState));
+                log.debug(String.format("endpoint address is null: " + update));
             }
             return false;
         }
         if (view.isQuarantined(endpoint)) {
             if (log.isDebugEnabled()) {
                 log.debug(format("Ignoring gossip for %s because it is a quarantined endpoint",
-                                 remoteState));
+                                 update));
             }
             return false;
         }
         Endpoint local = endpoints.get(endpoint);
         if (local != null) {
-            if (remoteState.getTime() > local.getTime()) {
+            if (update.state.getTime() > local.getTime()) {
                 long oldTime = local.getTime();
-                local.record(remoteState);
+                local.record(update.state);
                 notifyUpdate(local.getState());
                 if (log.isTraceEnabled()) {
                     log.trace(format("Updating state time stamp to %s from %s for %s",
@@ -779,7 +770,7 @@ public class Gossip {
                 return true;
             }
         } else {
-            discover(remoteState);
+            discover(update);
         }
         return false;
     }

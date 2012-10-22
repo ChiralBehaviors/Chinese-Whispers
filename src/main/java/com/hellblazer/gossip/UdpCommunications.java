@@ -73,16 +73,16 @@ public class UdpCommunications implements GossipCommunications {
         }
 
         @Override
-        public void reply(List<Digest> digests, List<ReplicatedState> states) {
+        public void reply(List<Digest> digests, List<Update> states) {
             sendDigests(digests, REPLY);
             update(states);
         }
 
         @Override
-        public void update(List<ReplicatedState> deltaState) {
+        public void update(List<Update> deltaState) {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
-            for (ReplicatedState state : deltaState) {
+            for (Update state : deltaState) {
                 UdpCommunications.this.update(UPDATE, state, target, buffer);
                 buffer.clear();
             }
@@ -226,7 +226,7 @@ public class UdpCommunications implements GossipCommunications {
     }
 
     @Override
-    public void update(ReplicatedState state, InetSocketAddress left) {
+    public void update(Update state, InetSocketAddress left) {
         ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
         update(RING, state, left, buffer);
         bufferPool.free(buffer);
@@ -271,38 +271,36 @@ public class UdpCommunications implements GossipCommunications {
     /**
      * @param msg
      */
-    private void handleRing(ByteBuffer msg) {
-        final ReplicatedState state;
+    private void handleRing(InetSocketAddress gossiper, ByteBuffer msg) {
+        final Update state;
         try {
-            state = new ReplicatedState(msg);
+            state = new Update(msg);
         } catch (Throwable e) {
             if (log.isWarnEnabled()) {
-                log.warn("Cannot deserialize heartbeat state. Ignoring the state.",
-                         e);
+                log.warn("Cannot deserialize state. Ignoring the state.", e);
             }
             return;
         }
         if (log.isTraceEnabled()) {
             log.trace(format("Heartbeat state from %s is : %s", this, state));
         }
-        gossip.ringUpdate(state);
+        gossip.ringUpdate(state, gossiper);
     }
 
-    private void handleUpdate(ByteBuffer msg) {
-        final ReplicatedState state;
+    private void handleUpdate(InetSocketAddress gossiper, ByteBuffer msg) {
+        final Update state;
         try {
-            state = new ReplicatedState(msg);
+            state = new Update(msg);
         } catch (Throwable e) {
             if (log.isWarnEnabled()) {
-                log.warn("Cannot deserialize heartbeat state. Ignoring the state.",
-                         e);
+                log.warn("Cannot deserialize state. Ignoring the state.", e);
             }
             return;
         }
         if (log.isTraceEnabled()) {
             log.trace(format("Heartbeat state from %s is : %s", this, state));
         }
-        gossip.update(state);
+        gossip.update(state, gossiper);
     }
 
     /**
@@ -323,11 +321,11 @@ public class UdpCommunications implements GossipCommunications {
                 break;
             }
             case UPDATE: {
-                handleUpdate(buffer);
+                handleUpdate(sender, buffer);
                 break;
             }
             case RING: {
-                handleRing(buffer);
+                handleRing(sender, buffer);
                 break;
             }
             default: {
@@ -465,8 +463,8 @@ public class UdpCommunications implements GossipCommunications {
      * @param address
      * @param buffer
      */
-    private void update(byte msg, ReplicatedState state,
-                        InetSocketAddress address, ByteBuffer buffer) {
+    private void update(byte msg, Update state, InetSocketAddress address,
+                        ByteBuffer buffer) {
         buffer.clear();
         buffer.order(ByteOrder.BIG_ENDIAN);
         buffer.position(DATA_POSITION);

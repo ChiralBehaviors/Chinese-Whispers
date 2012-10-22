@@ -65,7 +65,7 @@ public interface GossipMessages {
      *            - the updates for the node which are believed to be out of
      *            date
      */
-    void reply(List<Digest> digests, List<ReplicatedState> states);
+    void reply(List<Digest> digests, List<Update> states);
 
     /**
      * The third message of the gossip protocol. Send a list of updated states
@@ -74,6 +74,6 @@ public interface GossipMessages {
      * @param deltaState
      *            - the list of replicated states requested.
      */
-    void update(List<ReplicatedState> deltaState);
+    void update(List<Update> deltaState);
 
 }

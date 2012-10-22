@@ -102,6 +102,9 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public long getTime() {
+        if (state == null) {
+            return -1L;
+        }
         return state.getTime();
     }
 

@@ -14,10 +14,6 @@
  */
 package com.hellblazer.gossip;
 
-import static com.hellblazer.gossip.Endpoint.readInetAddress;
-import static com.hellblazer.gossip.Endpoint.writeInetAddress;
-
-import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
@@ -27,21 +23,15 @@ import java.util.UUID;
  * 
  */
 public class ReplicatedState {
-    private final UUID              id;
-    private final byte[]            state;
-    private volatile long           time = -1L;
-    private final InetSocketAddress address;
-
-    public ReplicatedState(InetSocketAddress address) {
-        this(address, null, null);
-    }
+    private final UUID    id;
+    private final byte[]  state;
+    private volatile long time = -1L;
 
     /**
      * @param id
      * @param state
      */
-    public ReplicatedState(InetSocketAddress address, UUID id, byte[] state) {
-        this.address = address;
+    public ReplicatedState(UUID id, byte[] state) {
         this.id = id;
         this.state = state;
     }
@@ -50,19 +40,11 @@ public class ReplicatedState {
      * @param buffer
      * @throws UnknownHostException
      */
-    public ReplicatedState(ByteBuffer buffer) throws UnknownHostException {
+    public ReplicatedState(ByteBuffer buffer) {
         time = buffer.getLong();
         id = new UUID(buffer.getLong(), buffer.getLong());
-        address = readInetAddress(buffer);
         state = new byte[buffer.remaining()];
-        buffer.get(state); 
-    }
-
-    /**
-     * @return the address
-     */
-    public InetSocketAddress getAddress() {
-        return address;
+        buffer.get(state);
     }
 
     /**
@@ -101,7 +83,6 @@ public class ReplicatedState {
         buffer.putLong(time);
         buffer.putLong(id.getMostSignificantBits());
         buffer.putLong(id.getLeastSignificantBits());
-        writeInetAddress(address, buffer);
         buffer.put(state);
     }
 
@@ -110,8 +91,7 @@ public class ReplicatedState {
      */
     @Override
     public String toString() {
-        return String.format("ReplicatedState [id=%s, time=%s, address=%s]",
-                             id, time, address);
+        return String.format("ReplicatedState [id=%s, time=%s]", id, time);
     }
 
     /* (non-Javadoc)

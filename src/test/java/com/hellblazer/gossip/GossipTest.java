@@ -51,26 +51,26 @@ public class GossipTest extends TestCase {
         InetSocketAddress address3 = new InetSocketAddress("127.0.0.1", 3);
         InetSocketAddress address4 = new InetSocketAddress("127.0.0.1", 4);
 
-        ReplicatedState state1 = new ReplicatedState(address1,
-                                                     new UUID(666, 1),
-                                                     new byte[0]);
-        ReplicatedState state2 = new ReplicatedState(address2,
-                                                     new UUID(666, 2),
-                                                     new byte[0]);
-        ReplicatedState state3 = new ReplicatedState(address3,
-                                                     new UUID(666, 3),
-                                                     new byte[0]);
-        ReplicatedState state4 = new ReplicatedState(address4,
-                                                     new UUID(666, 4),
-                                                     new byte[0]);
+        Update state1 = new Update(address1, new ReplicatedState(new UUID(666,
+                                                                          1),
+                                                                 new byte[0]));
+        Update state2 = new Update(address2, new ReplicatedState(new UUID(666,
+                                                                          2),
+                                                                 new byte[0]));
+        Update state3 = new Update(address3, new ReplicatedState(new UUID(666,
+                                                                          3),
+                                                                 new byte[0]));
+        Update state4 = new Update(address4, new ReplicatedState(new UUID(666,
+                                                                          4),
+                                                                 new byte[0]));
 
         Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
                                    random, 4, TimeUnit.DAYS);
 
-        gossip.update(state1);
-        gossip.update(state2);
-        gossip.update(state3);
-        gossip.update(state4);
+        gossip.update(state1, address1);
+        gossip.update(state2, address1);
+        gossip.update(state3, address1);
+        gossip.update(state4, address1);
 
         verify(communications).connect(eq(address1), isA(Endpoint.class),
                                        isA(Runnable.class));
@@ -106,23 +106,19 @@ public class GossipTest extends TestCase {
         InetSocketAddress address3 = new InetSocketAddress("127.0.0.1", 3);
         InetSocketAddress address4 = new InetSocketAddress("127.0.0.1", 4);
 
-        ReplicatedState state1 = new ReplicatedState(address1,
-                                                     new UUID(666, 1),
+        ReplicatedState state1 = new ReplicatedState(new UUID(666, 1),
                                                      new byte[] { 1 });
         state1.setTime(1);
 
-        ReplicatedState state2 = new ReplicatedState(address2,
-                                                     new UUID(666, 2),
+        ReplicatedState state2 = new ReplicatedState(new UUID(666, 2),
                                                      new byte[] { 2 });
         state2.setTime(1);
 
-        ReplicatedState state3 = new ReplicatedState(address3,
-                                                     new UUID(666, 3),
+        ReplicatedState state3 = new ReplicatedState(new UUID(666, 3),
                                                      new byte[] { 3 });
         state3.setTime(3);
 
-        ReplicatedState state4 = new ReplicatedState(address4,
-                                                     new UUID(666, 4),
+        ReplicatedState state4 = new ReplicatedState(new UUID(666, 4),
                                                      new byte[] { 4 });
         state4.setTime(1);
 
@@ -156,10 +152,10 @@ public class GossipTest extends TestCase {
         endpoints.put(address3, ep3);
         endpoints.put(address4, ep4);
 
-        gossip.update(state1);
-        gossip.update(state2);
-        gossip.update(state3);
-        gossip.update(state4);
+        gossip.update(new Update(address1, state1), address1);
+        gossip.update(new Update(address2, state2), address2);
+        gossip.update(new Update(address3, state3), address3);
+        gossip.update(new Update(address4, state4), address4);
 
         verify(ep1, new Times(2)).getTime();
         verify(ep1).record(state1);
@@ -210,8 +206,7 @@ public class GossipTest extends TestCase {
                        gossipHandler);
 
         verify(gossipHandler).reply(asList(digest1a, digest2a, digest3a,
-                                           digest4a),
-                                    new ArrayList<ReplicatedState>());
+                                           digest4a), new ArrayList<Update>());
         verifyNoMoreInteractions(gossipHandler);
     }
 
@@ -239,23 +234,19 @@ public class GossipTest extends TestCase {
         Digest digest1a = new Digest(address1, 1);
         Digest digest3a = new Digest(address3, 3);
 
-        ReplicatedState state1 = new ReplicatedState(address1,
-                                                     new UUID(666, 1),
+        ReplicatedState state1 = new ReplicatedState(new UUID(666, 1),
                                                      new byte[0]);
         state1.setTime(1);
 
-        ReplicatedState state2 = new ReplicatedState(address2,
-                                                     new UUID(666, 2),
+        ReplicatedState state2 = new ReplicatedState(new UUID(666, 2),
                                                      new byte[0]);
         state2.setTime(2);
 
-        ReplicatedState state3 = new ReplicatedState(address3,
-                                                     new UUID(666, 3),
+        ReplicatedState state3 = new ReplicatedState(new UUID(666, 3),
                                                      new byte[0]);
         state3.setTime(3);
 
-        ReplicatedState state4 = new ReplicatedState(address4,
-                                                     new UUID(666, 4),
+        ReplicatedState state4 = new ReplicatedState(new UUID(666, 4),
                                                      new byte[0]);
         state4.setTime(4);
 
@@ -275,8 +266,9 @@ public class GossipTest extends TestCase {
 
         gossip.examine(asList(digest1, digest2, digest3, digest4),
                        gossipHandler);
-        verify(gossipHandler).reply(asList(digest1a, digest3a),
-                                    asList(state2, state4));
+        verify(gossipHandler).reply(eq(asList(digest1a, digest3a)),
+                                    eq(asList(new Update(address2, state2),
+                                              new Update(address4, state4))));
         verifyNoMoreInteractions(gossipHandler);
     }
 }
