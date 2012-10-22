@@ -161,7 +161,7 @@ public class GossipTest extends TestCase {
         gossip.update(state3);
         gossip.update(state4);
 
-        verify(ep1, new Times(3)).getTime();
+        verify(ep1, new Times(2)).getTime();
         verify(ep1).record(state1);
         verify(ep1).getState();
         verifyNoMoreInteractions(ep1);
@@ -169,7 +169,7 @@ public class GossipTest extends TestCase {
         verify(ep2).getTime();
         verifyNoMoreInteractions(ep2);
 
-        verify(ep3, new Times(3)).getTime();
+        verify(ep3, new Times(2)).getTime();
         verify(ep3).record(state3);
         verify(ep3).getState();
         verifyNoMoreInteractions(ep3);
