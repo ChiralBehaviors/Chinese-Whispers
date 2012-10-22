@@ -9,7 +9,7 @@
 		</encoder>
 	</appender>
 
-	<root level="info">
+	<root level="warn">
 		<appender-ref ref="STDERR" />
 	</root>
 </configuration>
