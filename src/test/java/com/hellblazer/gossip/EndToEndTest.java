@@ -56,11 +56,8 @@ public class EndToEndTest extends TestCase {
             setLatches(id);
         }
 
-        /* (non-Javadoc)
-         * @see com.hellblazer.gossip.GossipListener#abandon(byte[])
-         */
         @Override
-        public void abandon(byte[] state) {
+        public void deregister(UUID id) {
             throw new IllegalStateException("Should never have abandoned");
         }
 
@@ -71,12 +68,8 @@ public class EndToEndTest extends TestCase {
             }
         }
 
-        /* (non-Javadoc)
-         * @see com.hellblazer.gossip.GossipListener#discover(byte[])
-         */
         @Override
-        public void discover(byte[] state) {
-            // System.out.println("Heartbeat received: " + hb);
+        public void register(UUID id, byte[] state) {
             int currentCount = count.incrementAndGet();
             if (currentCount % 100 == 0) {
                 System.out.print('.');
@@ -89,7 +82,7 @@ public class EndToEndTest extends TestCase {
         }
 
         @Override
-        public void update(byte[] state) {
+        public void update(UUID id, byte[] state) {
             assert state != null;
             // System.out.println("Heartbeat received: " + hb);
             int currentCount = count.incrementAndGet();
@@ -111,10 +104,13 @@ public class EndToEndTest extends TestCase {
         }
     }
 
+    private UUID[] stateIds;
+
     public void testEnd2End() throws Exception {
         int membership = 64;
         int maxSeeds = 1;
         Random entropy = new Random();
+        stateIds = new UUID[membership];
 
         Receiver[] receivers = new Receiver[membership];
         for (int i = 0; i < membership; i++) {
@@ -139,8 +135,10 @@ public class EndToEndTest extends TestCase {
             for (Gossip member : members) {
                 byte[] state = new byte[4];
                 ByteBuffer buffer = ByteBuffer.wrap(state);
-                buffer.putInt(id++);
-                member.start(state);
+                buffer.putInt(id);
+                member.start();
+                stateIds[id] = member.register(state);
+                id++;
             }
             for (int i = 0; i < membership; i++) {
                 receivers[i].await(60, TimeUnit.SECONDS);
@@ -191,9 +189,8 @@ public class EndToEndTest extends TestCase {
                                                                          1,
                                                                          1.0,
                                                                          true);
-        Gossip gossip = new Gossip(new UUID(0, i), receiver, communications,
-                                   view, fdFactory, new Random(), 1,
-                                   TimeUnit.SECONDS);
+        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
+                                   new Random(), 1, TimeUnit.SECONDS);
         return gossip;
     }
 
@@ -207,8 +204,9 @@ public class EndToEndTest extends TestCase {
         id = 0;
         for (Gossip member : members) {
             ByteBuffer state = ByteBuffer.wrap(new byte[4]);
-            state.putInt(id++);
-            member.updateLocalState(state.array());
+            state.putInt(id);
+            member.update(stateIds[id], state.array());
+            id++;
         }
         for (int i = 0; i < membership; i++) {
             receivers[i].await(60, TimeUnit.SECONDS);

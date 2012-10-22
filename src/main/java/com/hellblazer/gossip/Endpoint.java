@@ -64,15 +64,17 @@ public class Endpoint implements Comparable<Endpoint> {
     private volatile GossipMessages  handler;
     private volatile ReplicatedState state;
     private volatile boolean         isAlive = true;
+    private final InetSocketAddress  address;
 
-    public Endpoint() {
-        fd = null;
+    public Endpoint(InetSocketAddress address, FailureDetector failureDetector) {
+        this.address = address;
+        fd = failureDetector;
     }
 
-    public Endpoint(ReplicatedState replicatedState,
+    public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
                     FailureDetector failureDetector) {
+        this(address, failureDetector);
         state = replicatedState;
-        fd = failureDetector;
     }
 
     /* (non-Javadoc)
@@ -80,7 +82,17 @@ public class Endpoint implements Comparable<Endpoint> {
      */
     @Override
     public int compareTo(Endpoint o) {
-        return state.getId().compareTo(o.getState().getId());
+        if (address == o.address) {
+            return 0;
+        } else if (address.isUnresolved() || o.address.isUnresolved()) {
+            return address.toString().compareTo(o.address.toString());
+        } else {
+            int compare = getIp(address).compareTo(getIp(o.address));
+            if (compare == 0) {
+                compare = Integer.valueOf(address.getPort()).compareTo(o.address.getPort());
+            }
+            return compare;
+        }
     }
 
     @Override
@@ -88,7 +100,7 @@ public class Endpoint implements Comparable<Endpoint> {
         if (!(o instanceof Endpoint)) {
             return false;
         }
-        return state.getId().equals(((Endpoint) o).state.getId());
+        return address.equals(((Endpoint) o).address);
     }
 
     public GossipMessages getHandler() {
@@ -105,7 +117,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     @Override
     public int hashCode() {
-        return state.getId().hashCode();
+        return address.hashCode();
     }
 
     public boolean isAlive() {
@@ -155,5 +167,15 @@ public class Endpoint implements Comparable<Endpoint> {
             logger.trace(String.format("new replicated state time: %s",
                                        state.getTime()));
         }
+    }
+
+    public InetSocketAddress getAddress() {
+        return address;
+    }
+
+    Integer getIp(InetSocketAddress addr) {
+        byte[] a = addr.getAddress().getAddress();
+        return ((a[0] & 0xff) << 24) | ((a[1] & 0xff) << 16)
+               | ((a[2] & 0xff) << 8) | (a[3] & 0xff);
     }
 }

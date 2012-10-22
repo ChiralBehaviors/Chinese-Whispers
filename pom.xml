@@ -30,6 +30,22 @@
 			<version>1.0.7</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.hellblazer</groupId>
+			<artifactId>utils</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+        <dependency>
+            <groupId>com.fasterxml.uuid</groupId>
+            <artifactId>java-uuid-generator</artifactId>
+            <version>3.1.3</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 	</dependencies>
 
 	<build>

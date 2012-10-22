@@ -42,8 +42,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hellblazer.gossip.util.ByteBufferPool;
-import com.hellblazer.gossip.util.HexDump;
+import com.hellblazer.utils.ByteBufferPool;
+import com.hellblazer.utils.HexDump;
 
 /**
  * A UDP message protocol implementation of the gossip communications
@@ -201,15 +201,13 @@ public class UdpCommunications implements GossipCommunications {
 
     @Override
     public void send(ReplicatedState state, InetSocketAddress left) {
-        if (!gossip.isIgnoring(left)) {
-            ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
-            buffer.order(ByteOrder.BIG_ENDIAN);
-            buffer.position(4);
-            buffer.put(RING);
-            state.writeTo(buffer);
-            send(buffer, left);
-            bufferPool.free(buffer);
-        }
+        ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
+        buffer.order(ByteOrder.BIG_ENDIAN);
+        buffer.position(4);
+        buffer.put(RING);
+        state.writeTo(buffer);
+        send(buffer, left);
+        bufferPool.free(buffer);
     }
 
     @Override
@@ -333,12 +331,6 @@ public class UdpCommunications implements GossipCommunications {
      *            - the message bytes
      */
     private void processInbound(InetSocketAddress sender, ByteBuffer buffer) {
-        if (gossip.isIgnoring(sender)) {
-            if (log.isTraceEnabled()) {
-                log.trace(String.format("Ignoring inbound msg from: %s", sender));
-            }
-            return;
-        }
         byte msgType = buffer.get();
         switch (msgType) {
             case GOSSIP: {

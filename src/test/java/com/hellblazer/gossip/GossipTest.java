@@ -64,8 +64,8 @@ public class GossipTest extends TestCase {
                                                      new UUID(666, 4),
                                                      new byte[0]);
 
-        Gossip gossip = new Gossip(new UUID(0, 0), receiver, communications,
-                                   view, fdFactory, random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
+                                   random, 4, TimeUnit.DAYS);
 
         gossip.update(state1);
         gossip.update(state2);
@@ -136,12 +136,12 @@ public class GossipTest extends TestCase {
 
         when(ep4.getTime()).thenReturn(5L);
 
-        Gossip gossip = new Gossip(new UUID(0, 0), receiver, communications,
-                                   view, fdFactory, random, 4, TimeUnit.DAYS) {
+        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
+                                   random, 4, TimeUnit.DAYS) {
 
             @Override
             protected void notifyUpdate(ReplicatedState state) {
-                receiver.update(state.getState());
+                receiver.update(state.getId(), state.getState());
             }
         };
 
@@ -179,8 +179,8 @@ public class GossipTest extends TestCase {
 
         verify(communications).setGossip(gossip);
 
-        verify(receiver).update(state1.getState());
-        verify(receiver).update(state3.getState());
+        verify(receiver).update(state1.getId(), state1.getState());
+        verify(receiver).update(state3.getId(), state3.getState());
         verifyNoMoreInteractions(communications);
     }
 
@@ -203,8 +203,8 @@ public class GossipTest extends TestCase {
         Digest digest3a = new Digest(new InetSocketAddress("google.com", 3), -1);
         Digest digest4a = new Digest(new InetSocketAddress("google.com", 4), -1);
 
-        Gossip gossip = new Gossip(new UUID(0, 0), listener, communications,
-                                   view, fdFactory, random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(listener, communications, view, fdFactory,
+                                   random, 4, TimeUnit.DAYS);
 
         gossip.examine(asList(digest1, digest2, digest3, digest4),
                        gossipHandler);
@@ -259,8 +259,8 @@ public class GossipTest extends TestCase {
                                                      new byte[0]);
         state4.setTime(4);
 
-        Gossip gossip = new Gossip(new UUID(0, 0), listener, communications,
-                                   view, fdFactory, random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(listener, communications, view, fdFactory,
+                                   random, 4, TimeUnit.DAYS);
 
         Field ep = Gossip.class.getDeclaredField("endpoints");
         ep.setAccessible(true);
@@ -268,10 +268,10 @@ public class GossipTest extends TestCase {
         @SuppressWarnings("unchecked")
         ConcurrentMap<InetSocketAddress, Endpoint> endpoints = (ConcurrentMap<InetSocketAddress, Endpoint>) ep.get(gossip);
 
-        endpoints.put(address1, new Endpoint(state1, fd));
-        endpoints.put(address2, new Endpoint(state2, fd));
-        endpoints.put(address3, new Endpoint(state3, fd));
-        endpoints.put(address4, new Endpoint(state4, fd));
+        endpoints.put(address1, new Endpoint(address1, state1, fd));
+        endpoints.put(address2, new Endpoint(address2, state2, fd));
+        endpoints.put(address3, new Endpoint(address3, state3, fd));
+        endpoints.put(address4, new Endpoint(address4, state4, fd));
 
         gossip.examine(asList(digest1, digest2, digest3, digest4),
                        gossipHandler);

@@ -18,7 +18,6 @@ import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
@@ -30,8 +29,9 @@ public class Ring {
     private final Endpoint                           endpoint;
     private static final Logger                      log      = LoggerFactory.getLogger(Ring.class.getCanonicalName());
 
-    public Ring(UUID id, GossipCommunications comms) {
-        endpoint = new Endpoint(new ReplicatedState(null, id, null), null);
+    public Ring(InetSocketAddress address, GossipCommunications comms) {
+        endpoint = new Endpoint(address, new ReplicatedState(null, null, null),
+                                null);
         this.comms = comms;
     }
 

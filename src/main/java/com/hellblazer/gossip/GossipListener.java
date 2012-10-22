@@ -26,6 +26,8 @@
 
 package com.hellblazer.gossip;
 
+import java.util.UUID;
+
 /**
  * @author hhildebrand
  * 
@@ -34,21 +36,28 @@ public interface GossipListener {
     /**
      * The state is newly discovered
      * 
+     * @param id
+     *            - the id assigned to this state
      * @param state
+     *            - the content of the state
      */
-    void discover(byte[] state);
+    void register(UUID id, byte[] state);
 
     /**
      * Previously known state has been updated
      * 
+     * @param id
+     *            - the id assigned to this state
      * @param state
+     *            - the updated content of the state
      */
-    void update(byte[] state);
+    void update(UUID id, byte[] state);
 
     /**
      * Previously known state has been abandoned
      * 
-     * @param state
+     * @param id
+     *            - the id of the state that has been aba
      */
-    void abandon(byte[] state);
+    void deregister(UUID id);
 }

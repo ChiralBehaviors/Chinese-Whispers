@@ -17,9 +17,9 @@ package com.hellblazer.gossip.fd;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.hellblazer.gossip.FailureDetector;
-import com.hellblazer.gossip.util.RunningAverage;
-import com.hellblazer.gossip.util.RunningMedian;
-import com.hellblazer.gossip.util.SampledWindow;
+import com.hellblazer.utils.windows.RunningAverage;
+import com.hellblazer.utils.windows.RunningMedian;
+import com.hellblazer.utils.windows.SampledWindow;
 
 /**
  * Instead of providing information of a boolean nature (trust vs. suspect),

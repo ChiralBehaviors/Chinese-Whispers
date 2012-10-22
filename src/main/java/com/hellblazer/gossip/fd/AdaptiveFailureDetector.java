@@ -15,8 +15,8 @@
 package com.hellblazer.gossip.fd;
 
 import com.hellblazer.gossip.FailureDetector;
-import com.hellblazer.gossip.util.MultiWindow;
-import com.hellblazer.gossip.util.SkipList;
+import com.hellblazer.utils.collections.SkipList;
+import com.hellblazer.utils.windows.MultiWindow;
 
 /**
  * An adaptive accural failure detector based on the paper:

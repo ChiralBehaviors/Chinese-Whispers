@@ -21,7 +21,6 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -29,11 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +43,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.uuid.Generators;
+import com.fasterxml.uuid.NoArgGenerator;
 import com.hellblazer.gossip.Digest.DigestComparator;
 
 /**
@@ -81,7 +80,7 @@ public class Gossip {
     private final Random                                     entropy;
     private final FailureDetectorFactory                     fdFactory;
     private ScheduledFuture<?>                               gossipTask;
-    private final UUID                                       id;
+    private final NoArgGenerator                             idGenerator;
     private final int                                        interval;
     private final TimeUnit                                   intervalUnit;
     private final GossipListener                             listener;
@@ -89,13 +88,10 @@ public class Gossip {
     private final Ring                                       ring;
     private final AtomicBoolean                              running    = new AtomicBoolean();
     private final ScheduledExecutorService                   scheduler;
-    private final Set<UUID>                                  theShunned = new ConcurrentSkipListSet<UUID>();
     private final SystemView                                 view;
 
     /**
      * 
-     * @param identity
-     *            - the unique identity of this gossip node
      * @param stateListener
      *            - the ultimate listener of available gossip
      * @param systemView
@@ -109,11 +105,39 @@ public class Gossip {
      * @param unit
      *            - time unit for the gossip interval
      */
-    public Gossip(UUID identity, GossipListener stateListener,
+    public Gossip(GossipListener stateListener,
                   GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit) {
+        this(Generators.timeBasedGenerator(), stateListener,
+             communicationsService, systemView, failureDetectorFactory, random,
+             gossipInterval, unit);
+    }
+
+    /**
+     * 
+     * @param idGenerator
+     *            - the UUID generator for state ids on this node
+     * @param stateListener
+     *            - the ultimate listener of available gossip
+     * @param systemView
+     *            - the system management view of the member state
+     * @param failureDetectorFactory
+     *            - the factory producing instances of the failure detector
+     * @param random
+     *            - a source of entropy
+     * @param gossipInterval
+     *            - the period of the random gossiping
+     * @param unit
+     *            - time unit for the gossip interval
+     */
+    public Gossip(NoArgGenerator idGenerator, GossipListener stateListener,
+                  GossipCommunications communicationsService,
+                  SystemView systemView,
+                  FailureDetectorFactory failureDetectorFactory, Random random,
+                  int gossipInterval, TimeUnit unit) {
+        this.idGenerator = idGenerator;
         communications = communicationsService;
         communications.setGossip(this);
         listener = stateListener;
@@ -122,8 +146,7 @@ public class Gossip {
         interval = gossipInterval;
         intervalUnit = unit;
         fdFactory = failureDetectorFactory;
-        id = identity;
-        ring = new Ring(id, communications);
+        ring = new Ring(getLocalAddress(), communications);
         scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -161,34 +184,52 @@ public class Gossip {
         });
     }
 
+    /**
+     * Deregister the replicated state of this node identified by the id
+     * 
+     * @param id
+     */
+    public void deregister(UUID id) {
+        ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
+                                                    new byte[0]);
+        state.setTime(System.currentTimeMillis());
+        localState.set(state);
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("Member: %s abandoning replicated state",
+                                    getId()));
+        }
+        ring.send(state);
+    }
+
     public InetSocketAddress getLocalAddress() {
         return view.getLocalAddress();
     }
 
-    public boolean isIgnoring(InetSocketAddress address) {
-        Endpoint endpoint = endpoints.get(address);
-        if (endpoint == null || endpoint.getState() == null
-            || endpoint.getState().getId() == null) {
-            return false;
+    /**
+     * Add an identified piece of replicated state to this node
+     * 
+     * @param replicatedState
+     * @return the unique identifier for this state
+     */
+    public UUID register(byte[] replicatedState) {
+        UUID id = idGenerator.generate();
+        ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
+                                                    replicatedState);
+        state.setTime(System.currentTimeMillis());
+        localState.set(state);
+        if (log.isDebugEnabled()) {
+            log.debug(String.format("Member: %s registering replicated state",
+                                    getId()));
         }
-        return isIgnoring(endpoint.getState().getId());
+        ring.send(state);
+        return id;
     }
 
-    public boolean isIgnoring(UUID id) {
-        return theShunned.contains(id);
-    }
-
-    public void setIgnoring(Collection<UUID> ignoringUpdate) {
-        theShunned.clear();
-        theShunned.addAll(ignoringUpdate);
-    }
-
-    public void start(byte[] initialState) {
+    /**
+     * Start the gossip replication process
+     */
+    public void start() {
         if (running.compareAndSet(false, true)) {
-            ReplicatedState state = new ReplicatedState(view.getLocalAddress(),
-                                                        id, initialState);
-            state.setTime(System.currentTimeMillis());
-            localState.set(state);
             communications.start();
             gossipTask = scheduler.scheduleWithFixedDelay(gossipTask(),
                                                           interval, interval,
@@ -196,6 +237,9 @@ public class Gossip {
         }
     }
 
+    /**
+     * Terminate the gossip replication process
+     */
     public void terminate() {
         if (running.compareAndSet(true, false)) {
             communications.terminate();
@@ -205,7 +249,13 @@ public class Gossip {
         }
     }
 
-    public void updateLocalState(byte[] replicatedState) {
+    /**
+     * Update the local state
+     * 
+     * @param id
+     * @param replicatedState
+     */
+    public void update(UUID id, byte[] replicatedState) {
         ReplicatedState state = new ReplicatedState(view.getLocalAddress(), id,
                                                     replicatedState);
         state.setTime(System.currentTimeMillis());
@@ -257,7 +307,7 @@ public class Gossip {
                                      endpoint.getState().getId(),
                                      localState.get().getId()));
                 }
-                notifyAbandon(endpoint.getState());
+                notifyDeregister(endpoint.getState());
             }
         }
 
@@ -307,7 +357,8 @@ public class Gossip {
      */
     protected void connectAndGossipWith(final InetSocketAddress address,
                                         final List<Digest> digests) {
-        final Endpoint newEndpoint = new Endpoint(new ReplicatedState(address),
+        final Endpoint newEndpoint = new Endpoint(address,
+                                                  new ReplicatedState(address),
                                                   fdFactory.create());
         Runnable connectAction = new Runnable() {
             @Override
@@ -346,7 +397,8 @@ public class Gossip {
         if (view.getLocalAddress().equals(address)) {
             return; // it's our state, dummy
         }
-        final Endpoint endpoint = new Endpoint(remoteState, fdFactory.create());
+        final Endpoint endpoint = new Endpoint(address, remoteState,
+                                               fdFactory.create());
         Runnable connectAction = new Runnable() {
             @Override
             public void run() {
@@ -364,7 +416,7 @@ public class Gossip {
                     log.debug(format("Member %s is now UP",
                                      endpoint.getState().getId()));
                 }
-                notifyDiscover(endpoint.getState());
+                notifyRegister(endpoint.getState());
             }
 
         };
@@ -535,19 +587,19 @@ public class Gossip {
     /**
      * @param state
      */
-    protected void notifyAbandon(final ReplicatedState state) {
+    protected void notifyDeregister(final ReplicatedState state) {
         assert state != null;
         if (log.isDebugEnabled()) {
-            log.debug(String.format("Member: %s notifying abandonment of: %s",
+            log.debug(String.format("Member: %s notifying deregistration of: %s",
                                     getId(), state));
         }
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    listener.abandon(state.getState());
+                    listener.deregister(state.getId());
                 } catch (Throwable e) {
-                    log.warn(String.format("exception notifying listener of abandonmen of state %s",
+                    log.warn(String.format("exception notifying listener of deregistration of state %s",
                                            state.getAddress()));
                 }
             }
@@ -558,27 +610,20 @@ public class Gossip {
     /**
      * @param state
      */
-    protected void notifyDiscover(final ReplicatedState state) {
+    protected void notifyRegister(final ReplicatedState state) {
         assert state != null;
-        if (isIgnoring(state.getId())) {
-            if (log.isDebugEnabled()) {
-                log.debug(String.format("Member: %s discarding notification of: %s",
-                                        getId(), state));
-            }
-            return;
-        }
         if (log.isDebugEnabled()) {
-            log.debug(String.format("Member: %s notifying discovery of: %s",
+            log.debug(String.format("Member: %s notifying registration of: %s",
                                     getId(), state));
         }
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    listener.discover(state.getState());
+                    listener.register(state.getId(), state.getState());
                 } catch (Throwable e) {
-                    log.warn(String.format("exception notifying listener of discovery of state %s",
-                                           state.getAddress()));
+                    log.warn(String.format("exception notifying listener of registration of state %s",
+                                           state.getId()));
                 }
             }
         });
@@ -587,13 +632,6 @@ public class Gossip {
 
     protected void notifyUpdate(final ReplicatedState state) {
         assert state != null;
-        if (isIgnoring(state.getId())) {
-            if (log.isDebugEnabled()) {
-                log.debug(String.format("Member: %s discarding notification of: %s",
-                                        getId(), state));
-            }
-            return;
-        }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying update of: %s",
                                     getId(), state));
@@ -602,10 +640,10 @@ public class Gossip {
             @Override
             public void run() {
                 try {
-                    listener.update(state.getState());
+                    listener.update(state.getId(), state.getState());
                 } catch (Throwable e) {
                     log.warn(String.format("exception notifying listener of update of state %s",
-                                           state.getAddress()));
+                                           state.getId()));
                 }
             }
         });
@@ -617,7 +655,10 @@ public class Gossip {
         for (Entry<InetSocketAddress, Endpoint> entry : endpoints.entrySet()) {
             digests.add(new Digest(entry.getKey(), entry.getValue()));
         }
-        digests.add(new Digest(localState.get()));
+        ReplicatedState local = localState.get();
+        if (local != null) {
+            digests.add(new Digest(getLocalAddress(), local));
+        }
         Collections.shuffle(digests, entropy);
         if (log.isTraceEnabled()) {
             log.trace(format("Gossip digests are : %s", digests));

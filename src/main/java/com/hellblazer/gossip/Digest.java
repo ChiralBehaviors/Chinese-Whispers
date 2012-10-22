@@ -50,9 +50,9 @@ public class Digest {
         time = msg.getLong();
     }
 
-    public Digest(ReplicatedState state) {
-        address = state.getAddress();
+    public Digest(InetSocketAddress address, ReplicatedState state) {
         assert address != null : "Null replicated state address";
+        this.address = address;
         time = state.getTime();
     }
 
