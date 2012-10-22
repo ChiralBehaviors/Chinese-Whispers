@@ -111,7 +111,7 @@ public class ReplicatedState {
     @Override
     public String toString() {
         return String.format("ReplicatedState [id=%s, time=%s, address=%s]",
-                             time, address);
+                             id, time, address);
     }
 
     /* (non-Javadoc)

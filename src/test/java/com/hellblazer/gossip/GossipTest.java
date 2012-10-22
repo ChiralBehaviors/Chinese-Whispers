@@ -76,8 +76,8 @@ public class GossipTest extends TestCase {
                                                      new UUID(666, 4),
                                                      new byte[0]);
 
-        Gossip gossip = new Gossip(view, random, receiver, communications, 4,
-                                   TimeUnit.DAYS, fdFactory, new UUID(0, 0));
+        Gossip gossip = new Gossip(new UUID(0, 0), receiver, communications,
+                                   view, fdFactory, random, 4, TimeUnit.DAYS);
 
         gossip.apply(asList(state1, state2, state3, state4));
 
@@ -145,8 +145,8 @@ public class GossipTest extends TestCase {
 
         when(ep4.getTime()).thenReturn(5L);
 
-        Gossip gossip = new Gossip(view, random, receiver, communications, 4,
-                                   TimeUnit.DAYS, fdFactory, new UUID(0, 0)) {
+        Gossip gossip = new Gossip(new UUID(0, 0), receiver, communications,
+                                   view, fdFactory, random, 4, TimeUnit.DAYS) {
 
             @Override
             protected void notifyUpdate(ReplicatedState state) {
@@ -210,8 +210,8 @@ public class GossipTest extends TestCase {
         Digest digest3a = new Digest(new InetSocketAddress("google.com", 3), -1);
         Digest digest4a = new Digest(new InetSocketAddress("google.com", 4), -1);
 
-        Gossip gossip = new Gossip(view, random, listener, communications, 4,
-                                   TimeUnit.DAYS, fdFactory, new UUID(0, 0));
+        Gossip gossip = new Gossip(new UUID(0, 0), listener, communications,
+                                   view, fdFactory, random, 4, TimeUnit.DAYS);
 
         gossip.examine(asList(digest1, digest2, digest3, digest4),
                        gossipHandler);
@@ -266,8 +266,8 @@ public class GossipTest extends TestCase {
                                                      new byte[0]);
         state4.setTime(4);
 
-        Gossip gossip = new Gossip(view, random, listener, communications, 4,
-                                   TimeUnit.DAYS, fdFactory, new UUID(0, 0));
+        Gossip gossip = new Gossip(new UUID(0, 0), listener, communications,
+                                   view, fdFactory, random, 4, TimeUnit.DAYS);
 
         Field ep = Gossip.class.getDeclaredField("endpoints");
         ep.setAccessible(true);

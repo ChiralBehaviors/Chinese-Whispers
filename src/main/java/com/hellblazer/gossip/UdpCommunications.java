@@ -85,7 +85,6 @@ public class UdpCommunications implements GossipCommunications {
                 buffer.position(4);
                 buffer.put(UPDATE);
                 state.writeTo(buffer);
-                buffer.flip();
                 send(buffer, target);
                 buffer.clear();
             }
@@ -194,7 +193,6 @@ public class UdpCommunications implements GossipCommunications {
             buffer.position(4);
             buffer.put(UPDATE);
             state.writeTo(buffer);
-            buffer.flip();
             send(buffer, left);
             bufferPool.free(buffer);
         }
@@ -412,10 +410,8 @@ public class UdpCommunications implements GossipCommunications {
                                        buffer);
                     } catch (Throwable e) {
                         if (log.isWarnEnabled()) {
-                            log.warn(format("Invalid message: %s",
-                                            prettyPrint(packet.getSocketAddress(),
-                                                        getLocalAddress(),
-                                                        buffer.array())), e);
+                            log.warn(format("Error processing inbound message on: %s",
+                                            getLocalAddress()), e);
                         }
                     }
                 } else {

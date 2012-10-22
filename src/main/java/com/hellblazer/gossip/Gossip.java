@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -63,7 +63,8 @@ import com.hellblazer.gossip.Digest.DigestComparator;
  * A sends node B the requested state that completes a round of gossip. When
  * messages are received, the protocol updates the endpoint's failure detector
  * with the liveness information. If the endpoint's failure detector predicts
- * that the endpoint has failed, the endpoint is marked dead.
+ * that the endpoint has failed, the endpoint is marked dead and its replicated
+ * state is abandoned.
  * 
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
@@ -72,44 +73,44 @@ public class Gossip {
     private final static Logger                              log        = LoggerFactory.getLogger(Gossip.class);
 
     private final GossipCommunications                       communications;
+    private final Executor                                   dispatcher;
     private final ConcurrentMap<InetSocketAddress, Endpoint> endpoints  = new ConcurrentHashMap<InetSocketAddress, Endpoint>();
     private final Random                                     entropy;
-    private final AtomicReference<ReplicatedState>           localState = new AtomicReference<ReplicatedState>();
-    private final SystemView                                 view;
+    private final FailureDetectorFactory                     fdFactory;
     private ScheduledFuture<?>                               gossipTask;
+    private final UUID                                       id;
     private final int                                        interval;
     private final TimeUnit                                   intervalUnit;
-    private final ScheduledExecutorService                   scheduler;
-    private final ExecutorService                            dispatcher;
     private final GossipListener                             listener;
-    private final AtomicBoolean                              running    = new AtomicBoolean();
-    private final FailureDetectorFactory                     fdFactory;
+    private final AtomicReference<ReplicatedState>           localState = new AtomicReference<ReplicatedState>();
     private final Ring                                       ring;
-    private final Set<UUID>                                  theShunned = new HashSet<UUID>();
-    private final UUID                                       id;
+    private final AtomicBoolean                              running    = new AtomicBoolean();
+    private final ScheduledExecutorService                   scheduler;
+    private final Set<UUID>                                  theShunned = new ConcurrentSkipListSet<UUID>();
+    private final SystemView                                 view;
 
     /**
      * 
-     * @param systemView
-     *            - the system management view of the member state
-     * @param random
-     *            - a source of entropy
+     * @param identity
+     *            - the unique identity of this gossip node
      * @param stateListener
      *            - the ultimate listener of available gossip
+     * @param systemView
+     *            - the system management view of the member state
+     * @param failureDetectorFactory
+     *            - the factory producing instances of the failure detector
+     * @param random
+     *            - a source of entropy
      * @param gossipInterval
      *            - the period of the random gossiping
      * @param unit
      *            - time unit for the gossip interval
-     * @param failureDetectorFactory
-     *            - the factory producing instances of the failure detector
-     * @param identity
-     *            - the unique identity of this gossip node
      */
-    public Gossip(SystemView systemView, Random random,
-                  GossipListener stateListener,
+    public Gossip(UUID identity, GossipListener stateListener,
                   GossipCommunications communicationsService,
-                  int gossipInterval, TimeUnit unit,
-                  FailureDetectorFactory failureDetectorFactory, UUID identity) {
+                  SystemView systemView,
+                  FailureDetectorFactory failureDetectorFactory, Random random,
+                  int gossipInterval, TimeUnit unit) {
         communications = communicationsService;
         communications.setGossip(this);
         listener = stateListener;
@@ -130,13 +131,14 @@ public class Gossip {
                 daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread t, Throwable e) {
-                        log.warn("Uncaught exception", e);
+                        log.warn("Uncaught exception on the gossip servicing thread",
+                                 e);
                     }
                 });
                 return daemon;
             }
         });
-        dispatcher = Executors.newCachedThreadPool(new ThreadFactory() {
+        dispatcher = Executors.newSingleThreadExecutor(new ThreadFactory() {
             volatile int count = 0;
 
             @Override
@@ -147,7 +149,8 @@ public class Gossip {
                 daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
                     @Override
                     public void uncaughtException(Thread t, Throwable e) {
-                        log.warn("Uncaught exception", e);
+                        log.warn("Uncaught exception on the gossip dispatching thread",
+                                 e);
                     }
                 });
                 return daemon;
@@ -161,7 +164,8 @@ public class Gossip {
 
     public boolean isIgnoring(InetSocketAddress address) {
         Endpoint endpoint = endpoints.get(address);
-        if (endpoint == null) {
+        if (endpoint == null || endpoint.getState() == null
+            || endpoint.getState().getId() == null) {
             return false;
         }
         return isIgnoring(endpoint.getState().getId());
@@ -204,8 +208,8 @@ public class Gossip {
         state.setTime(System.currentTimeMillis());
         localState.set(state);
         if (log.isDebugEnabled()) {
-            log.debug(String.format("Member: %s sending replicated state: %s",
-                                    getId(), state));
+            log.debug(String.format("Member: %s updating replicated state",
+                                    getId()));
         }
         ring.update(endpoints.values());
         ring.send(state);
@@ -239,8 +243,8 @@ public class Gossip {
                 continue;
             }
             if (view.isQuarantined(endpoint)) {
-                if (log.isTraceEnabled()) {
-                    log.trace(format("Ignoring gossip for %s because it is a quarantined endpoint",
+                if (log.isDebugEnabled()) {
+                    log.debug(format("Ignoring gossip for %s because it is a quarantined endpoint",
                                      remoteState));
                 }
                 continue;
@@ -287,10 +291,15 @@ public class Gossip {
                 notifyAbandon(endpoint.getState());
             }
         }
+
         if (log.isTraceEnabled()) {
-            log.trace("Culling the quarantined and unreachable...");
+            log.trace("Culling the quarantined...");
         }
         view.cullQuarantined(now);
+
+        if (log.isTraceEnabled()) {
+            log.trace("Culling the unreachable...");
+        }
         view.cullUnreachable(now);
     }
 
@@ -566,7 +575,12 @@ public class Gossip {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                listener.abandon(state.getState());
+                try {
+                    listener.abandon(state.getState());
+                } catch (Throwable e) {
+                    log.warn(String.format("exception notifying listener of abandonmen of state %s",
+                                           state.getAddress()));
+                }
             }
         });
         ring.send(state);
@@ -591,7 +605,12 @@ public class Gossip {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                listener.discover(state.getState());
+                try {
+                    listener.discover(state.getState());
+                } catch (Throwable e) {
+                    log.warn(String.format("exception notifying listener of discovery of state %s",
+                                           state.getAddress()));
+                }
             }
         });
         ring.send(state);
@@ -613,7 +632,12 @@ public class Gossip {
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                listener.update(state.getState());
+                try {
+                    listener.update(state.getState());
+                } catch (Throwable e) {
+                    log.warn(String.format("exception notifying listener of update of state %s",
+                                           state.getAddress()));
+                }
             }
         });
         ring.send(state);
