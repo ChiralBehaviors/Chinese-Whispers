@@ -14,8 +14,10 @@
  */
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.GossipMessages.DATA_POSITION;
 import static com.hellblazer.gossip.GossipMessages.DIGEST_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.GOSSIP;
+import static com.hellblazer.gossip.GossipMessages.MAX_SEG_SIZE;
 import static com.hellblazer.gossip.GossipMessages.REPLY;
 import static com.hellblazer.gossip.GossipMessages.RING;
 import static com.hellblazer.gossip.GossipMessages.UPDATE;
@@ -81,10 +83,7 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             for (ReplicatedState state : deltaState) {
-                buffer.position(4);
-                buffer.put(UPDATE);
-                state.writeTo(buffer);
-                send(buffer, target);
+                UdpCommunications.this.update(UPDATE, state, target, buffer);
                 buffer.clear();
             }
             bufferPool.free(buffer);
@@ -94,10 +93,10 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             for (int i = 0; i < digests.size();) {
-                int count = min(MAX_DIGESTS, digests.size() - i);
-                buffer.position(4);
+                byte count = (byte) min(MAX_DIGESTS, digests.size() - i);
+                buffer.position(DATA_POSITION);
                 buffer.put(messageType);
-                buffer.putInt(count);
+                buffer.put(count);
                 for (int j = i; j < count; j++) {
                     digests.get(j).writeTo(buffer);
                 }
@@ -113,30 +112,25 @@ public class UdpCommunications implements GossipCommunications {
     private static final int    DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
     private static final int    DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
     private static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
-    private static final int    MAGIC_NUMBER                      = 24051967;
-    private static final int    MAX_DIGESTS;
-    /**
-     * MAX_SEG_SIZE is a default maximum packet size. This may be small, but any
-     * network will be capable of handling this size so the packet transfer
-     * semantics are atomic (no fragmentation in the network).
-     */
-    private static final int    MAX_SEG_SIZE                      = 1500;
-
-    static {
-        MAX_DIGESTS = (MAX_SEG_SIZE - 4 - 4) / DIGEST_BYTE_SIZE;
-    }
+    private static final int    MAGIC_NUMBER                      = 0xCAFEBABE;
+    private static final int    MAX_DIGESTS                       = (MAX_SEG_SIZE
+                                                                     - DATA_POSITION - 1)
+                                                                    / DIGEST_BYTE_SIZE;
 
     private static String prettyPrint(SocketAddress sender,
-                                      SocketAddress target, byte[] bytes) {
-        final StringBuilder sb = new StringBuilder(bytes.length * 2);
+                                      SocketAddress target, byte[] bytes,
+                                      int length) {
+        final StringBuilder sb = new StringBuilder(length * 2);
         sb.append('\n');
         sb.append(new SimpleDateFormat().format(new Date()));
         sb.append(" sender: ");
         sb.append(sender);
         sb.append(" target: ");
         sb.append(target);
+        sb.append(" length: ");
+        sb.append(length);
         sb.append('\n');
-        sb.append(toHex(bytes, 0, bytes.length));
+        sb.append(toHex(bytes, 0, length));
         return sb.toString();
     }
 
@@ -155,6 +149,7 @@ public class UdpCommunications implements GossipCommunications {
     private final AtomicBoolean   running    = new AtomicBoolean();
 
     private final DatagramSocket  socket;
+    private InetSocketAddress     localAddress;
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor) {
@@ -175,6 +170,8 @@ public class UdpCommunications implements GossipCommunications {
             throw new IllegalStateException(format("Unable to bind to: %s",
                                                    endpoint), e);
         }
+        localAddress = new InetSocketAddress(socket.getLocalAddress(),
+                                             socket.getLocalPort());
         try {
             socket.setReceiveBufferSize(MAX_SEG_SIZE * receiveBufferMultiplier);
             socket.setSendBufferSize(MAX_SEG_SIZE * sendBufferMultiplier);
@@ -195,19 +192,7 @@ public class UdpCommunications implements GossipCommunications {
 
     @Override
     public InetSocketAddress getLocalAddress() {
-        return new InetSocketAddress(socket.getLocalAddress(),
-                                     socket.getLocalPort());
-    }
-
-    @Override
-    public void send(ReplicatedState state, InetSocketAddress left) {
-        ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
-        buffer.order(ByteOrder.BIG_ENDIAN);
-        buffer.position(4);
-        buffer.put(RING);
-        state.writeTo(buffer);
-        send(buffer, left);
-        bufferPool.free(buffer);
+        return localAddress;
     }
 
     @Override
@@ -240,11 +225,19 @@ public class UdpCommunications implements GossipCommunications {
         }
     }
 
-    private void handleGossip(final InetSocketAddress target, ByteBuffer msg) {
-        int count = msg.getInt();
-        if (log.isTraceEnabled()) {
-            log.trace("Handling gossip, digest count: " + count);
-        }
+    @Override
+    public void update(ReplicatedState state, InetSocketAddress left) {
+        ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
+        update(RING, state, left, buffer);
+        bufferPool.free(buffer);
+    }
+
+    /**
+     * @param msg
+     * @return
+     */
+    private List<Digest> extractDigests(SocketAddress sender, ByteBuffer msg) {
+        int count = msg.get();
         final List<Digest> digests = new ArrayList<Digest>(count);
         for (int i = 0; i < count; i++) {
             Digest digest;
@@ -252,39 +245,27 @@ public class UdpCommunications implements GossipCommunications {
                 digest = new Digest(msg);
             } catch (Throwable e) {
                 if (log.isWarnEnabled()) {
-                    log.warn("Cannot deserialize digest. Ignoring the digest.",
+                    log.warn(String.format("Cannot deserialize digest. Ignoring the digest: %s\n%s",
+                                           i,
+                                           prettyPrint(sender,
+                                                       getLocalAddress(),
+                                                       msg.array(), msg.limit())),
                              e);
                 }
                 continue;
             }
             digests.add(digest);
         }
-        if (log.isTraceEnabled()) {
-            log.trace(format("Gossip digests from %s are : %s", this, digests));
-        }
-        gossip.gossip(digests, new GossipHandler(target));
+        return digests;
+    }
+
+    private void handleGossip(final InetSocketAddress gossiper, ByteBuffer msg) {
+        gossip.gossip(extractDigests(gossiper, msg),
+                      new GossipHandler(gossiper));
     }
 
     private void handleReply(final InetSocketAddress target, ByteBuffer msg) {
-        int digestCount = msg.getInt();
-        if (log.isTraceEnabled()) {
-            log.trace("Handling reply, digest count: " + digestCount);
-        }
-        final List<Digest> digests = new ArrayList<Digest>(digestCount);
-        for (int i = 0; i < digestCount; i++) {
-            Digest digest;
-            try {
-                digest = new Digest(msg);
-            } catch (Throwable e) {
-                if (log.isWarnEnabled()) {
-                    log.warn("Cannot deserialize digest. Ignoring the digest.",
-                             e);
-                }
-                continue;
-            }
-            digests.add(digest);
-        }
-        gossip.reply(digests, new GossipHandler(target));
+        gossip.reply(extractDigests(target, msg), new GossipHandler(target));
     }
 
     /**
@@ -367,15 +348,15 @@ public class UdpCommunications implements GossipCommunications {
      */
     private void send(ByteBuffer buffer, SocketAddress target) {
         assert !socket.isClosed() : "Sending on a closed socket";
+        int length = buffer.position();
         buffer.putInt(0, MAGIC_NUMBER);
         try {
             byte[] bytes = buffer.array();
-            DatagramPacket packet = new DatagramPacket(bytes, bytes.length,
-                                                       target);
+            DatagramPacket packet = new DatagramPacket(bytes, length, target);
             if (log.isTraceEnabled()) {
                 log.trace(String.format("sending packet %s",
                                         prettyPrint(getLocalAddress(), target,
-                                                    buffer.array())));
+                                                    buffer.array(), length)));
             }
             socket.send(packet);
         } catch (SocketException e) {
@@ -405,7 +386,7 @@ public class UdpCommunications implements GossipCommunications {
         final DatagramPacket packet = new DatagramPacket(buffer.array(),
                                                          buffer.array().length);
         socket.receive(packet);
-        // buffer.limit(packet.getLength());
+        buffer.limit(packet.getLength());
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
@@ -413,7 +394,8 @@ public class UdpCommunications implements GossipCommunications {
                     log.trace(String.format("Received packet %s",
                                             prettyPrint(packet.getSocketAddress(),
                                                         getLocalAddress(),
-                                                        buffer.array())));
+                                                        buffer.array(),
+                                                        packet.getLength())));
                 } else if (log.isTraceEnabled()) {
                     log.trace("Received packet from: "
                               + packet.getSocketAddress());
@@ -435,7 +417,8 @@ public class UdpCommunications implements GossipCommunications {
                                         magic,
                                         prettyPrint(packet.getSocketAddress(),
                                                     getLocalAddress(),
-                                                    buffer.array())));
+                                                    buffer.array(),
+                                                    packet.getLength())));
                     }
                 }
                 bufferPool.free(buffer);
@@ -475,5 +458,20 @@ public class UdpCommunications implements GossipCommunications {
                 }
             }
         };
+    }
+
+    /**
+     * @param state
+     * @param address
+     * @param buffer
+     */
+    private void update(byte msg, ReplicatedState state,
+                        InetSocketAddress address, ByteBuffer buffer) {
+        buffer.clear();
+        buffer.order(ByteOrder.BIG_ENDIAN);
+        buffer.position(DATA_POSITION);
+        buffer.put(msg);
+        state.writeTo(buffer);
+        send(buffer, address);
     }
 }

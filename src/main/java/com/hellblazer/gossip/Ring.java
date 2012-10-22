@@ -43,7 +43,7 @@ public class Ring {
     public void send(ReplicatedState state) {
         InetSocketAddress target = neighbor.get();
         if (target != null) {
-            comms.send(state, target);
+            comms.update(state, target);
         } else {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Ring has not been formed, not forwarding state"));

@@ -196,7 +196,7 @@ public class Gossip {
         localState.set(state);
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s abandoning replicated state",
-                                    getId()));
+                                    getLocalAddress()));
         }
         ring.send(state);
     }
@@ -219,7 +219,7 @@ public class Gossip {
         localState.set(state);
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s registering replicated state",
-                                    getId()));
+                                    getLocalAddress()));
         }
         ring.send(state);
         return id;
@@ -262,7 +262,7 @@ public class Gossip {
         localState.set(state);
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s updating replicated state",
-                                    getId()));
+                                    getLocalAddress()));
         }
         ring.update(endpoints.values());
         ring.send(state);
@@ -426,7 +426,7 @@ public class Gossip {
     protected void examine(List<Digest> digests, GossipMessages gossipHandler) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving gossip digests: %s",
-                                    getId(), digests));
+                                    getLocalAddress(), digests));
         }
         List<Digest> deltaDigests = new ArrayList<Digest>();
         List<ReplicatedState> deltaState = new ArrayList<ReplicatedState>();
@@ -454,18 +454,16 @@ public class Gossip {
         if (!deltaDigests.isEmpty() || !deltaState.isEmpty()) {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Member: %s replying with digests: %s state: %s",
-                                        getId(), deltaDigests, deltaState));
+                                        getLocalAddress(), deltaDigests,
+                                        deltaState));
             }
             gossipHandler.reply(deltaDigests, deltaState);
         } else {
             if (log.isTraceEnabled()) {
-                log.trace(String.format("Member: %s no state to send", getId()));
+                log.trace(String.format("Member: %s no state to send",
+                                        getLocalAddress()));
             }
         }
-    }
-
-    protected UUID getId() {
-        return localState.get().getId();
     }
 
     /**
@@ -570,8 +568,8 @@ public class Gossip {
         if (endpoint != null) {
             if (log.isTraceEnabled()) {
                 log.trace(format("%s gossiping with: %s, #digests: %s",
-                                 getId(), endpoint.getState().getId(),
-                                 digests.size()));
+                                 getLocalAddress(),
+                                 endpoint.getState().getId(), digests.size()));
             }
             endpoint.getHandler().gossip(digests);
             return address;
@@ -591,7 +589,7 @@ public class Gossip {
         assert state != null;
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying deregistration of: %s",
-                                    getId(), state));
+                                    getLocalAddress(), state));
         }
         dispatcher.execute(new Runnable() {
             @Override
@@ -614,7 +612,7 @@ public class Gossip {
         assert state != null;
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying registration of: %s",
-                                    getId(), state));
+                                    getLocalAddress(), state));
         }
         dispatcher.execute(new Runnable() {
             @Override
@@ -634,7 +632,7 @@ public class Gossip {
         assert state != null;
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying update of: %s",
-                                    getId(), state));
+                                    getLocalAddress(), state));
         }
         dispatcher.execute(new Runnable() {
             @Override
@@ -683,7 +681,7 @@ public class Gossip {
     protected void reply(List<Digest> digests, GossipMessages gossipHandler) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving reply digests: %s",
-                                    getId(), digests));
+                                    getLocalAddress(), digests));
         }
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -695,7 +693,7 @@ public class Gossip {
         if (!deltaState.isEmpty()) {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Member: %s sending update states: %s",
-                                        getId(), deltaState));
+                                        getLocalAddress(), deltaState));
             }
             gossipHandler.update(deltaState);
         }
@@ -751,7 +749,7 @@ public class Gossip {
     protected boolean update(ReplicatedState remoteState) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving update state: %s",
-                                    getId(), remoteState));
+                                    getLocalAddress(), remoteState));
         }
         InetSocketAddress endpoint = remoteState.getAddress();
         if (endpoint == null) {

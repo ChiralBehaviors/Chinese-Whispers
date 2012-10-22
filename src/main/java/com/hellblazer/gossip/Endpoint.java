@@ -35,12 +35,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public static InetSocketAddress readInetAddress(ByteBuffer msg)
                                                                    throws UnknownHostException {
-        int length = msg.get();
-        if (length == 0) {
-            return null;
-        }
-
-        byte[] address = new byte[length];
+        byte[] address = new byte[4];
         msg.get(address);
         int port = msg.getInt();
 
@@ -50,12 +45,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public static void writeInetAddress(InetSocketAddress ipaddress,
                                         ByteBuffer bytes) {
-        if (ipaddress == null) {
-            bytes.put((byte) 0);
-            return;
-        }
         byte[] address = ipaddress.getAddress().getAddress();
-        bytes.put((byte) address.length);
         bytes.put(address);
         bytes.putInt(ipaddress.getPort());
     }

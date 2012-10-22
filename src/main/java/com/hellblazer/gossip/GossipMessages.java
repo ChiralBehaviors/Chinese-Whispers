@@ -23,16 +23,21 @@ import java.util.List;
  * 
  */
 public interface GossipMessages {
-    byte GOSSIP                     = 0;
-    byte REPLY                      = 1;
-    byte UPDATE                     = 2;
-    byte RING                       = 3;
-    int  INET_ADDRESS_V6_BYTE_SIZE  = 16;
-    int  INET_ADDRESS_MAX_BYTE_SIZE = INET_ADDRESS_V6_BYTE_SIZE // address
-                                    + 1 // addressLength
-                                    + 4; // port 
+    /**
+     * MAX_SEG_SIZE is a default maximum packet size. This may be small, but any
+     * network will be capable of handling this size so the packet transfer
+     * semantics are atomic (no fragmentation in the network).
+     */
+    int  MAX_SEG_SIZE               = 1500;
+    int  DATA_POSITION              = 4;
+    byte GOSSIP                     = 1;
+    byte REPLY                      = 2;
+    byte UPDATE                     = 3;
+    byte RING                       = 4;
+    int  INET_ADDRESS_MAX_BYTE_SIZE = 4 // address 
+                                    + 4;   // port 
     int  DIGEST_BYTE_SIZE           = INET_ADDRESS_MAX_BYTE_SIZE // address
-                                    + 8; // timestamp
+                                    + 8;   // timestamp
 
     /**
      * Close the communications connection

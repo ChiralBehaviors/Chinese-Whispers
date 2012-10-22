@@ -55,7 +55,7 @@ public class ReplicatedState {
         id = new UUID(buffer.getLong(), buffer.getLong());
         address = readInetAddress(buffer);
         state = new byte[buffer.remaining()];
-        buffer.get(state);
+        buffer.get(state); 
     }
 
     /**
