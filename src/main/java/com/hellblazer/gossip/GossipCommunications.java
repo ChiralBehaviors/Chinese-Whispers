@@ -53,7 +53,7 @@ public interface GossipCommunications {
     InetSocketAddress getLocalAddress();
 
     /**
-     * Send the heartbeat state to the two members
+     * Send the replicated state around the ring via the left members
      * 
      * @param state
      * @param inetSocketAddress

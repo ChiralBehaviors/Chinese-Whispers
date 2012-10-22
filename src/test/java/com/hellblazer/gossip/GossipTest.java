@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -34,17 +33,6 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.TestCase;
 
 import org.mockito.internal.verification.Times;
-
-import com.hellblazer.gossip.Digest;
-import com.hellblazer.gossip.Endpoint;
-import com.hellblazer.gossip.FailureDetector;
-import com.hellblazer.gossip.FailureDetectorFactory;
-import com.hellblazer.gossip.Gossip;
-import com.hellblazer.gossip.GossipCommunications;
-import com.hellblazer.gossip.GossipListener;
-import com.hellblazer.gossip.GossipMessages;
-import com.hellblazer.gossip.ReplicatedState;
-import com.hellblazer.gossip.SystemView;
 
 public class GossipTest extends TestCase {
 
@@ -79,7 +67,10 @@ public class GossipTest extends TestCase {
         Gossip gossip = new Gossip(new UUID(0, 0), receiver, communications,
                                    view, fdFactory, random, 4, TimeUnit.DAYS);
 
-        gossip.apply(asList(state1, state2, state3, state4));
+        gossip.update(state1);
+        gossip.update(state2);
+        gossip.update(state3);
+        gossip.update(state4);
 
         verify(communications).connect(eq(address1), isA(Endpoint.class),
                                        isA(Runnable.class));
@@ -165,8 +156,10 @@ public class GossipTest extends TestCase {
         endpoints.put(address3, ep3);
         endpoints.put(address4, ep4);
 
-        List<ReplicatedState> states = asList(state1, state2, state3, state4);
-        gossip.apply(states);
+        gossip.update(state1);
+        gossip.update(state2);
+        gossip.update(state3);
+        gossip.update(state4);
 
         verify(ep1, new Times(2)).getTime();
         verify(ep1).record(state1);

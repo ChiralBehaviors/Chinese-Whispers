@@ -25,11 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Ring {
-    private final GossipCommunications                 comms;
-    private final AtomicReference<InetSocketAddress[]> neighbors = new AtomicReference<InetSocketAddress[]>(
-                                                                                                            new InetSocketAddress[2]);
-    private final Endpoint                             endpoint;
-    private static final Logger                        log       = LoggerFactory.getLogger(Ring.class.getCanonicalName());
+    private final GossipCommunications               comms;
+    private final AtomicReference<InetSocketAddress> neighbor = new AtomicReference<InetSocketAddress>();
+    private final Endpoint                           endpoint;
+    private static final Logger                      log      = LoggerFactory.getLogger(Ring.class.getCanonicalName());
 
     public Ring(UUID id, GossipCommunications comms) {
         endpoint = new Endpoint(new ReplicatedState(null, id, null), null);
@@ -42,14 +41,12 @@ public class Ring {
      * @param state
      */
     public void send(ReplicatedState state) {
-        InetSocketAddress[] targets = neighbors.get();
-        for (int i = 0; i < targets.length; i++) {
-            if (targets[i] != null) {
-                comms.send(state, targets[i]);
-            } else {
-                if (log.isTraceEnabled()) {
-                    log.trace(String.format("Ring has not been formed, not forwarding state"));
-                }
+        InetSocketAddress target = neighbor.get();
+        if (target != null) {
+            comms.send(state, target);
+        } else {
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("Ring has not been formed, not forwarding state"));
             }
         }
     }
@@ -69,21 +66,13 @@ public class Ring {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Ring has not been formed"));
             }
+            return;
         }
         SortedSet<Endpoint> head = members.headSet(endpoint);
-        SortedSet<Endpoint> tail = members.tailSet(endpoint);
-        InetSocketAddress[] hood = new InetSocketAddress[2];
         if (!head.isEmpty()) {
-            hood[0] = head.last().getState().getAddress();
+            neighbor.set(head.last().getState().getAddress());
         } else {
-            hood[0] = members.last().getState().getAddress();
+            neighbor.set(members.last().getState().getAddress());
         }
-        if (tail.size() > 0) {
-            hood[1] = tail.first().getState().getAddress();
-        } else {
-            hood[1] = members.first().getState().getAddress();
-        }
-        neighbors.set(hood);
     }
-
 }

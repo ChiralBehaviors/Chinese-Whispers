@@ -26,26 +26,13 @@ public interface GossipMessages {
     byte GOSSIP                     = 0;
     byte REPLY                      = 1;
     byte UPDATE                     = 2;
+    byte RING                       = 3;
     int  INET_ADDRESS_V6_BYTE_SIZE  = 16;
     int  INET_ADDRESS_MAX_BYTE_SIZE = INET_ADDRESS_V6_BYTE_SIZE // address
                                     + 1 // addressLength
-                                    + 4;  // port
-    int  NODE_ID_SET_MAX_BYTE_SIZE  = 257;
-    int  IDENTITY_BYTE_SIZE         = 16;
-    int  HEARTBEAT_STATE_BYTE_SIZE  = IDENTITY_BYTE_SIZE // candidate
-                                      + INET_ADDRESS_MAX_BYTE_SIZE // heartbeat address
-                                      + NODE_ID_SET_MAX_BYTE_SIZE // msgLinks
-                                      + 1 // preferred
-                                      + 1 // discoveryOnly
-                                      + IDENTITY_BYTE_SIZE // sender
-                                      + INET_ADDRESS_MAX_BYTE_SIZE // senderAddress
-                                      + 1 // stable
-                                      + INET_ADDRESS_MAX_BYTE_SIZE // testInterface
-                                      + NODE_ID_SET_MAX_BYTE_SIZE // view
-                                      + 4 // viewNumber
-                                      + 4; // viewTimeStamp 
+                                    + 4; // port 
     int  DIGEST_BYTE_SIZE           = INET_ADDRESS_MAX_BYTE_SIZE // address
-                                    + 8;  // timestamp
+                                    + 8; // timestamp
 
     /**
      * Close the communications connection
@@ -63,8 +50,8 @@ public interface GossipMessages {
 
     /**
      * The second message in the gossip protocol. Send a list of digests the
-     * node this handler represents, that would like heartbeat state updates
-     * for, along with the list of heartbeat state this node believes is out of
+     * node this handler represents, that would like replicated state updates
+     * for, along with the list of replicated state this node believes is out of
      * date on the node this handler represents.
      * 
      * @param digests
@@ -76,12 +63,11 @@ public interface GossipMessages {
     void reply(List<Digest> digests, List<ReplicatedState> states);
 
     /**
-     * The third message of the gossip protocol. Send a list of updated
-     * heartbeat states to the node this handler represents, which is requesting
-     * the updates.
+     * The third message of the gossip protocol. Send a list of updated states
+     * to the node this handler represents, which is requesting the updates.
      * 
      * @param deltaState
-     *            - the list of heartbeat states requested.
+     *            - the list of replicated states requested.
      */
     void update(List<ReplicatedState> deltaState);
 

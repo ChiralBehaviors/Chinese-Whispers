@@ -17,10 +17,10 @@ package com.hellblazer.gossip;
 import static com.hellblazer.gossip.GossipMessages.DIGEST_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.GOSSIP;
 import static com.hellblazer.gossip.GossipMessages.REPLY;
+import static com.hellblazer.gossip.GossipMessages.RING;
 import static com.hellblazer.gossip.GossipMessages.UPDATE;
 import static java.lang.Math.min;
 import static java.lang.String.format;
-import static java.util.Arrays.asList;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,7 +34,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -127,6 +126,20 @@ public class UdpCommunications implements GossipCommunications {
         MAX_DIGESTS = (MAX_SEG_SIZE - 4 - 4) / DIGEST_BYTE_SIZE;
     }
 
+    private static String prettyPrint(SocketAddress sender,
+                                      SocketAddress target, byte[] bytes) {
+        final StringBuilder sb = new StringBuilder(bytes.length * 2);
+        sb.append('\n');
+        sb.append(new SimpleDateFormat().format(new Date()));
+        sb.append(" sender: ");
+        sb.append(sender);
+        sb.append(" target: ");
+        sb.append(target);
+        sb.append('\n');
+        sb.append(toHex(bytes, 0, bytes.length));
+        return sb.toString();
+    }
+
     private static String toHex(byte[] data, int offset, int length) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
         PrintStream stream = new PrintStream(baos);
@@ -135,12 +148,13 @@ public class UdpCommunications implements GossipCommunications {
         return baos.toString();
     }
 
+    private final ByteBufferPool  bufferPool = new ByteBufferPool("UDP Comms",
+                                                                  100);
     private final ExecutorService dispatcher;
     private Gossip                gossip;
     private final AtomicBoolean   running    = new AtomicBoolean();
+
     private final DatagramSocket  socket;
-    private final ByteBufferPool  bufferPool = new ByteBufferPool("UDP Comms",
-                                                                  100);
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor) {
@@ -191,7 +205,7 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             buffer.position(4);
-            buffer.put(UPDATE);
+            buffer.put(RING);
             state.writeTo(buffer);
             send(buffer, left);
             bufferPool.free(buffer);
@@ -272,8 +286,27 @@ public class UdpCommunications implements GossipCommunications {
             }
             digests.add(digest);
         }
-        gossip.reply(digests, Collections.<ReplicatedState> emptyList(),
-                     new GossipHandler(target));
+        gossip.reply(digests, new GossipHandler(target));
+    }
+
+    /**
+     * @param msg
+     */
+    private void handleRing(ByteBuffer msg) {
+        final ReplicatedState state;
+        try {
+            state = new ReplicatedState(msg);
+        } catch (Throwable e) {
+            if (log.isWarnEnabled()) {
+                log.warn("Cannot deserialize heartbeat state. Ignoring the state.",
+                         e);
+            }
+            return;
+        }
+        if (log.isTraceEnabled()) {
+            log.trace(format("Heartbeat state from %s is : %s", this, state));
+        }
+        gossip.ringUpdate(state);
     }
 
     private void handleUpdate(ByteBuffer msg) {
@@ -290,21 +323,7 @@ public class UdpCommunications implements GossipCommunications {
         if (log.isTraceEnabled()) {
             log.trace(format("Heartbeat state from %s is : %s", this, state));
         }
-        gossip.update(asList(state));
-    }
-
-    private static String prettyPrint(SocketAddress sender,
-                                      SocketAddress target, byte[] bytes) {
-        final StringBuilder sb = new StringBuilder(bytes.length * 2);
-        sb.append('\n');
-        sb.append(new SimpleDateFormat().format(new Date()));
-        sb.append(" sender: ");
-        sb.append(sender);
-        sb.append(" target: ");
-        sb.append(target);
-        sb.append('\n');
-        sb.append(toHex(bytes, 0, bytes.length));
-        return sb.toString();
+        gossip.update(state);
     }
 
     /**
@@ -332,6 +351,10 @@ public class UdpCommunications implements GossipCommunications {
             }
             case UPDATE: {
                 handleUpdate(buffer);
+                break;
+            }
+            case RING: {
+                handleRing(buffer);
                 break;
             }
             default: {

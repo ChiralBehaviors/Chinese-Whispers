@@ -52,19 +52,22 @@ import com.hellblazer.gossip.Digest.DigestComparator;
  * The embodiment of the gossip protocol. This protocol replicates state and
  * forms both a member discovery and failure detection service. Periodically,
  * the protocol chooses a random member from the system view and initiates a
- * round of gossip with it. A round of gossip is push/pull and involves 3
- * messages. For example, if node A wants to initiate a round of gossip with
- * node B it starts off by sending node B a gossip message containing a digest
- * of the view number state of the local view of the replicated state. Node B on
- * receipt of this message sends node A a reply containing a list of digests
- * representing the updated state required, based on the received digests. In
- * addition, the node also sends along a list of updated state that is more
- * recent, based on the initial list of digests. On receipt of this message node
- * A sends node B the requested state that completes a round of gossip. When
- * messages are received, the protocol updates the endpoint's failure detector
- * with the liveness information. If the endpoint's failure detector predicts
- * that the endpoint has failed, the endpoint is marked dead and its replicated
- * state is abandoned.
+ * round of gossip with it.A round of gossip is push/pull and involves 3
+ * messages.
+ * 
+ * For example, if node A wants to initiate a round of gossip with node B it
+ * starts off by sending node B a gossip message containing a digest of the view
+ * number state of the local view of the replicated state. Node B on receipt of
+ * this message sends node A a reply containing a list of digests representing
+ * the updated state required, based on the received digests. In addition, the
+ * node also sends along a list of updated state that is more recent, based on
+ * the initial list of digests. On receipt of this message node A sends node B
+ * the requested state that completes a round of gossip.
+ * 
+ * When messages are received, the protocol updates the endpoint's failure
+ * detector with the liveness information. If the endpoint's failure detector
+ * predicts that the endpoint has failed, the endpoint is marked dead and its
+ * replicated state is abandoned.
  * 
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
@@ -228,40 +231,6 @@ public class Gossip {
             if (view.getLocalAddress().equals(endpoint)
                 && localState.get().getTime() > time) {
                 deltaState.add(localState.get());
-            }
-        }
-    }
-
-    protected void apply(List<ReplicatedState> list) {
-        for (ReplicatedState remoteState : list) {
-            InetSocketAddress endpoint = remoteState.getAddress();
-            if (endpoint == null) {
-                if (log.isDebugEnabled()) {
-                    log.debug(String.format("endpoint address is null: "
-                                            + remoteState));
-                }
-                continue;
-            }
-            if (view.isQuarantined(endpoint)) {
-                if (log.isDebugEnabled()) {
-                    log.debug(format("Ignoring gossip for %s because it is a quarantined endpoint",
-                                     remoteState));
-                }
-                continue;
-            }
-            Endpoint local = endpoints.get(endpoint);
-            if (local != null) {
-                if (remoteState.getTime() > local.getTime()) {
-                    long oldTime = local.getTime();
-                    local.record(remoteState);
-                    notifyUpdate(local.getState());
-                    if (log.isTraceEnabled()) {
-                        log.trace(format("Updating state time stamp to %s from %s for %s",
-                                         local.getTime(), oldTime, endpoint));
-                    }
-                }
-            } else {
-                discover(remoteState);
             }
         }
     }
@@ -661,24 +630,20 @@ public class Gossip {
      * to the initial gossip message sent by this node. The response is a list
      * of digests that represent the replicated state that is out of date on the
      * sender. In addition, the sender also supplies replicated state that is
-     * more recent than the digests supplied in the initial gossip message.
+     * more recent than the digests supplied in the initial gossip message (sent
+     * as update messages)
      * 
      * @param digests
      *            - the list of digests the gossiper would like to hear about
-     * @param list
-     *            - the list of replicated states the gossiper thinks is out of
-     *            date on the receiver
      * @param gossipHandler
      *            - the handler to send a list of replicated states that the
      *            gossiper would like updates for
      */
-    protected void reply(List<Digest> digests, List<ReplicatedState> list,
-                         GossipMessages gossipHandler) {
+    protected void reply(List<Digest> digests, GossipMessages gossipHandler) {
         if (log.isTraceEnabled()) {
-            log.trace(String.format("Member: %s receiving reply digests: %s states: %s",
-                                    getId(), digests, list));
+            log.trace(String.format("Member: %s receiving reply digests: %s",
+                                    getId(), digests));
         }
-        apply(list);
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
         List<ReplicatedState> deltaState = new ArrayList();
@@ -692,6 +657,18 @@ public class Gossip {
                                         getId(), deltaState));
             }
             gossipHandler.update(deltaState);
+        }
+    }
+
+    /**
+     * The replicated state is being sent around the ring. If the state is
+     * applied, continue sending the state around the ring
+     * 
+     * @param state
+     */
+    protected void ringUpdate(ReplicatedState state) {
+        if (update(state)) {
+            ring.send(state);
         }
     }
 
@@ -726,14 +703,45 @@ public class Gossip {
      * the gossip protocol. The supplied state is the updated state requested by
      * the receiver in response to the digests in the original gossip message.
      * 
-     * @param remoteStates
-     *            - the list of updated states we requested from our partner
+     * @param remoteState
+     *            - the updated state requested from our partner
+     * @return true if the state was applied, false otherwise
      */
-    protected void update(List<ReplicatedState> remoteStates) {
+    protected boolean update(ReplicatedState remoteState) {
         if (log.isTraceEnabled()) {
-            log.trace(String.format("Member: %s receiving update states: %s",
-                                    getId(), remoteStates));
+            log.trace(String.format("Member: %s receiving update state: %s",
+                                    getId(), remoteState));
         }
-        apply(remoteStates);
+        InetSocketAddress endpoint = remoteState.getAddress();
+        if (endpoint == null) {
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("endpoint address is null: "
+                                        + remoteState));
+            }
+            return false;
+        }
+        if (view.isQuarantined(endpoint)) {
+            if (log.isDebugEnabled()) {
+                log.debug(format("Ignoring gossip for %s because it is a quarantined endpoint",
+                                 remoteState));
+            }
+            return false;
+        }
+        Endpoint local = endpoints.get(endpoint);
+        if (local != null) {
+            if (remoteState.getTime() > local.getTime()) {
+                long oldTime = local.getTime();
+                local.record(remoteState);
+                notifyUpdate(local.getState());
+                if (log.isTraceEnabled()) {
+                    log.trace(format("Updating state time stamp to %s from %s for %s",
+                                     local.getTime(), oldTime, endpoint));
+                }
+                return true;
+            }
+        } else {
+            discover(remoteState);
+        }
+        return false;
     }
 }
