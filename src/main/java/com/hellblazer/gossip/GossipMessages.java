@@ -14,6 +14,7 @@
  */
 package com.hellblazer.gossip;
 
+import java.net.SocketAddress;
 import java.util.List;
 
 /**
@@ -37,6 +38,7 @@ public interface GossipMessages {
     int  INET_ADDRESS_MAX_BYTE_SIZE = 4 // address 
                                     + 4;   // port 
     int  DIGEST_BYTE_SIZE           = INET_ADDRESS_MAX_BYTE_SIZE // address
+                                    + 16 // UUID
                                     + 8;   // timestamp
 
     /**
@@ -75,5 +77,10 @@ public interface GossipMessages {
      *            - the list of replicated states requested.
      */
     void update(List<Update> deltaState);
+
+    /**
+     * @return
+     */
+    SocketAddress getGossipper();
 
 }

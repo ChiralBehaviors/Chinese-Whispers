@@ -18,9 +18,14 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.hellblazer.utils.collections.OaHashSet;
 
 /**
  * The Endpoint keeps track of the heartbeat state and the failure detector for
@@ -32,6 +37,26 @@ import org.slf4j.LoggerFactory;
 
 public class Endpoint implements Comparable<Endpoint> {
     protected static Logger logger = LoggerFactory.getLogger(Endpoint.class);
+
+    public static int compare(InetSocketAddress o1, InetSocketAddress o2) {
+        if (o1 == o2) {
+            return 0;
+        } else if (o1.isUnresolved() || o2.isUnresolved()) {
+            return o1.toString().compareTo(o2.toString());
+        } else {
+            int compare = getIp(o1).compareTo(getIp(o2));
+            if (compare == 0) {
+                compare = Integer.valueOf(o1.getPort()).compareTo(o2.getPort());
+            }
+            return compare;
+        }
+    }
+
+    public static Integer getIp(InetSocketAddress addr) {
+        byte[] a = addr.getAddress().getAddress();
+        return (a[0] & 0xff) << 24 | (a[1] & 0xff) << 16 | (a[2] & 0xff) << 8
+               | a[3] & 0xff;
+    }
 
     public static InetSocketAddress readInetAddress(ByteBuffer msg)
                                                                    throws UnknownHostException {
@@ -50,11 +75,11 @@ public class Endpoint implements Comparable<Endpoint> {
         bytes.putInt(ipaddress.getPort());
     }
 
-    private final FailureDetector    fd;
-    private volatile GossipMessages  handler;
-    private volatile ReplicatedState state;
-    private volatile boolean         isAlive = true;
-    private final InetSocketAddress  address;
+    private final FailureDetector            fd;
+    private volatile GossipMessages          handler;
+    private final OaHashSet<ReplicatedState> states  = new OaHashSet<ReplicatedState>();
+    private volatile boolean                 isAlive = true;
+    private final InetSocketAddress          address;
 
     public Endpoint(InetSocketAddress address, FailureDetector failureDetector) {
         this.address = address;
@@ -64,7 +89,18 @@ public class Endpoint implements Comparable<Endpoint> {
     public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
                     FailureDetector failureDetector) {
         this(address, failureDetector);
-        state = replicatedState;
+        states.add(replicatedState);
+    }
+
+    /**
+     * @param digests
+     */
+    public void addDigestsTo(ArrayList<Digest> digests) {
+        synchronized (states) {
+            for (ReplicatedState state : states) {
+                digests.add(new Digest(address, state));
+            }
+        }
     }
 
     /* (non-Javadoc)
@@ -72,17 +108,7 @@ public class Endpoint implements Comparable<Endpoint> {
      */
     @Override
     public int compareTo(Endpoint o) {
-        if (address == o.address) {
-            return 0;
-        } else if (address.isUnresolved() || o.address.isUnresolved()) {
-            return address.toString().compareTo(o.address.toString());
-        } else {
-            int compare = getIp(address).compareTo(getIp(o.address));
-            if (compare == 0) {
-                compare = Integer.valueOf(address.getPort()).compareTo(o.address.getPort());
-            }
-            return compare;
-        }
+        return compare(address, o.address);
     }
 
     @Override
@@ -93,15 +119,27 @@ public class Endpoint implements Comparable<Endpoint> {
         return address.equals(((Endpoint) o).address);
     }
 
+    public InetSocketAddress getAddress() {
+        return address;
+    }
+
     public GossipMessages getHandler() {
         return handler;
     }
 
-    public ReplicatedState getState() {
-        return state;
+    public ReplicatedState getState(UUID id) {
+        synchronized (states) {
+            for (ReplicatedState state : states) {
+                if (id.equals(state.getId())) {
+                    return state;
+                }
+            }
+        }
+        return null;
     }
 
-    public long getTime() {
+    public long getTime(UUID id) {
+        ReplicatedState state = getState(id);
         if (state == null) {
             return -1L;
         }
@@ -126,10 +164,12 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public void record(ReplicatedState newState) {
-        if (state != newState) {
-            state = newState;
-            fd.record(state.getTime(), System.currentTimeMillis());
+        synchronized (states) {
+            states.remove(newState);
+            states.add(newState);
         }
+        fd.record(newState.getTime(),
+                  System.currentTimeMillis() - newState.getTime());
     }
 
     public void setCommunications(GossipMessages communications) {
@@ -151,24 +191,35 @@ public class Endpoint implements Comparable<Endpoint> {
 
     @Override
     public String toString() {
-        return "Endpoint " + state.getId();
+        return String.format("Endpoint[%s]", address);
     }
 
     public void updateState(ReplicatedState newState) {
-        state = newState;
+        synchronized (states) {
+            states.remove(newState);
+            states.add(newState);
+        }
         if (logger.isTraceEnabled()) {
             logger.trace(String.format("new replicated state time: %s",
-                                       state.getTime()));
+                                       newState.getTime()));
         }
     }
 
-    public InetSocketAddress getAddress() {
-        return address;
+    /**
+     * @return
+     */
+    public Collection<ReplicatedState> getStates() {
+        synchronized (states) {
+            return new ArrayList<ReplicatedState>(states);
+        }
     }
 
-    Integer getIp(InetSocketAddress addr) {
-        byte[] a = addr.getAddress().getAddress();
-        return ((a[0] & 0xff) << 24) | ((a[1] & 0xff) << 16)
-               | ((a[2] & 0xff) << 8) | (a[3] & 0xff);
+    /**
+     * @param state
+     */
+    public void addState(ReplicatedState state) {
+        synchronized (states) {
+            states.add(state);
+        }
     }
 }

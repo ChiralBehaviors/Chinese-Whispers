@@ -17,11 +17,10 @@ package com.hellblazer.gossip;
 import static com.hellblazer.gossip.Endpoint.readInetAddress;
 import static com.hellblazer.gossip.Endpoint.writeInetAddress;
 
-import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Comparator;
+import java.util.UUID;
 
 /**
  * Contains information about a specified list of Endpoints and the largest
@@ -30,43 +29,48 @@ import java.util.Comparator;
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
  */
-public class Digest {
-    public static class DigestComparator implements Serializable,
-            Comparator<Digest> {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public int compare(Digest digest1, Digest digest2) {
-            return (int) (digest1.time - digest2.time);
-        }
-    }
+public class Digest implements Comparable<Digest> {
 
     private final InetSocketAddress address;
+    private final UUID              id;
     private final long              time;
 
     public Digest(ByteBuffer msg) throws UnknownHostException {
         address = readInetAddress(msg);
         assert address != null : "Null digest address";
+        id = new UUID(msg.getLong(), msg.getLong());
         time = msg.getLong();
     }
 
     public Digest(InetSocketAddress address, ReplicatedState state) {
-        assert address != null : "Null replicated state address";
-        this.address = address;
-        time = state.getTime();
+        this(address, state.getId(), state.getTime());
     }
 
-    public Digest(InetSocketAddress socketAddress, Endpoint ep) {
-        address = socketAddress;
-        assert address != null : "Null digest address address";
-        time = ep.getTime();
-    }
-
-    public Digest(InetSocketAddress ep, long diffTime) {
+    public Digest(InetSocketAddress ep, UUID id, long diffTime) {
         address = ep;
+        this.id = id;
         time = diffTime;
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Comparable#compareTo(java.lang.Object)
+     */
+    @Override
+    public int compareTo(Digest o) {
+        int addressCompare = Endpoint.compare(address, o.address);
+        if (addressCompare != 0) {
+            return addressCompare;
+        }
+        int uuidCompare = id.compareTo(o.id);
+        if (uuidCompare != 0) {
+            return uuidCompare;
+        }
+        return Long.valueOf(time).compareTo(Long.valueOf(o.time));
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -79,11 +83,11 @@ public class Digest {
             return false;
         }
         Digest other = (Digest) obj;
-        if (address == null) {
-            if (other.address != null) {
+        if (id == null) {
+            if (other.id != null) {
                 return false;
             }
-        } else if (!address.equals(other.address)) {
+        } else if (!id.equals(other.id)) {
             return false;
         }
         if (time != other.time) {
@@ -96,15 +100,25 @@ public class Digest {
         return address;
     }
 
+    /**
+     * @return the id
+     */
+    public UUID getId() {
+        return id;
+    }
+
     public long getTime() {
         return time;
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (address == null ? 0 : address.hashCode());
+        result = prime * result + (id == null ? 0 : id.hashCode());
         result = prime * result + (int) (time ^ time >>> 32);
         return result;
     }
@@ -114,12 +128,16 @@ public class Digest {
         StringBuilder sb = new StringBuilder();
         sb.append(address);
         sb.append(":");
+        sb.append(id);
+        sb.append(":");
         sb.append(time);
         return sb.toString();
     }
 
     public void writeTo(ByteBuffer buffer) {
         writeInetAddress(address, buffer);
+        buffer.putLong(id.getMostSignificantBits());
+        buffer.putLong(id.getLeastSignificantBits());
         buffer.putLong(time);
     }
 }

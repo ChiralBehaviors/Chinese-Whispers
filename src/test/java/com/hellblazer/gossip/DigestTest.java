@@ -16,12 +16,9 @@ package com.hellblazer.gossip;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 import junit.framework.TestCase;
-
-import com.hellblazer.gossip.Digest;
-import com.hellblazer.gossip.GossipMessages;
-import com.hellblazer.gossip.Digest.DigestComparator;
 
 /**
  * Basic testing of the digest state
@@ -32,7 +29,7 @@ import com.hellblazer.gossip.Digest.DigestComparator;
 public class DigestTest extends TestCase {
     public void testBasic() throws Exception {
         InetSocketAddress address = new InetSocketAddress("localhost", 80);
-        Digest s = new Digest(address, 667);
+        Digest s = new Digest(address, new UUID(0, 0), 667);
         assertEquals(667, s.getTime());
         assertEquals(address, s.getAddress());
         byte[] bytes = new byte[GossipMessages.DIGEST_BYTE_SIZE];
@@ -42,12 +39,11 @@ public class DigestTest extends TestCase {
         Digest d = new Digest(msg);
         assertEquals(667, d.getTime());
         assertEquals(address, d.getAddress());
-        DigestComparator comparator = new DigestComparator();
-        assertEquals(0, comparator.compare(s, d));
+        assertEquals(0, s.compareTo(d));
 
-        Digest l2 = new Digest(address, 666);
-        assertEquals(-1, comparator.compare(l2, d));
-        Digest g2 = new Digest(address, 668);
-        assertEquals(1, comparator.compare(g2, d));
+        Digest l2 = new Digest(address, new UUID(0, 0), 666);
+        assertEquals(-1, l2.compareTo(d));
+        Digest g2 = new Digest(address, new UUID(0, 0), 668);
+        assertEquals(1, g2.compareTo(d));
     }
 }

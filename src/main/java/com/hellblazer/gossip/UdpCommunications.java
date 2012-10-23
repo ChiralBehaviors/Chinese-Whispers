@@ -35,7 +35,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -55,11 +54,11 @@ import com.hellblazer.utils.HexDump;
  */
 public class UdpCommunications implements GossipCommunications {
     private class GossipHandler implements GossipMessages {
-        private final InetSocketAddress target;
+        private final InetSocketAddress gossipper;
 
         GossipHandler(InetSocketAddress target) {
             assert target.getPort() != 0 : "Invalid port";
-            this.target = target;
+            this.gossipper = target;
         }
 
         @Override
@@ -83,7 +82,7 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             for (Update state : deltaState) {
-                UdpCommunications.this.update(UPDATE, state, target, buffer);
+                UdpCommunications.this.update(UPDATE, state, gossipper, buffer);
                 buffer.clear();
             }
             bufferPool.free(buffer);
@@ -97,14 +96,22 @@ public class UdpCommunications implements GossipCommunications {
                 buffer.position(DATA_POSITION);
                 buffer.put(messageType);
                 buffer.put(count);
-                for (int j = i; j < count; j++) {
-                    digests.get(j).writeTo(buffer);
+                int position;
+                for (Digest digest : digests.subList(i, i + count)) {
+                    digest.writeTo(buffer);
+                    position = buffer.position();
+                    Integer.toString(position);
                 }
-                send(buffer, target);
+                send(buffer, gossipper);
                 i += count;
                 buffer.clear();
             }
             bufferPool.free(buffer);
+        }
+
+        @Override
+        public SocketAddress getGossipper() {
+            return gossipper;
         }
 
     }
@@ -236,9 +243,9 @@ public class UdpCommunications implements GossipCommunications {
      * @param msg
      * @return
      */
-    private List<Digest> extractDigests(SocketAddress sender, ByteBuffer msg) {
+    private Digest[] extractDigests(SocketAddress sender, ByteBuffer msg) {
         int count = msg.get();
-        final List<Digest> digests = new ArrayList<Digest>(count);
+        final Digest[] digests = new Digest[count];
         for (int i = 0; i < count; i++) {
             Digest digest;
             try {
@@ -254,7 +261,7 @@ public class UdpCommunications implements GossipCommunications {
                 }
                 continue;
             }
-            digests.add(digest);
+            digests[i] = digest;
         }
         return digests;
     }
@@ -345,8 +352,13 @@ public class UdpCommunications implements GossipCommunications {
      * @throws IOException
      */
     private void send(ByteBuffer buffer, SocketAddress target) {
-        assert !socket.isClosed() : "Sending on a closed socket";
+        if (socket.isClosed()) {
+            log.trace(String.format("Sending on a closed socket"));
+            return;
+        }
         int length = buffer.position();
+        if (length == 6)
+            System.out.println("Ruh Roh");
         buffer.putInt(0, MAGIC_NUMBER);
         try {
             byte[] bytes = buffer.array();

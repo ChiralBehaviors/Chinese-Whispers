@@ -61,11 +61,14 @@ public class EndToEndTest extends TestCase {
             throw new IllegalStateException("Should never have abandoned");
         }
 
-        public void await(int timeout, TimeUnit unit)
-                                                     throws InterruptedException {
+        public boolean await(int timeout, TimeUnit unit)
+                                                        throws InterruptedException {
             for (CountDownLatch latche : latches) {
-                latche.await(timeout, unit);
+                if (!latche.await(timeout, unit)) {
+                    return false;
+                }
             }
+            return true;
         }
 
         @Override
@@ -141,7 +144,8 @@ public class EndToEndTest extends TestCase {
                 id++;
             }
             for (int i = 0; i < membership; i++) {
-                receivers[i].await(60, TimeUnit.SECONDS);
+                assertTrue("did not receive all notifications for initial iteration",
+                           receivers[i].await(20, TimeUnit.SECONDS));
             }
             System.out.println();
             System.out.println("Initial iteration completed");
@@ -209,7 +213,8 @@ public class EndToEndTest extends TestCase {
             id++;
         }
         for (int i = 0; i < membership; i++) {
-            receivers[i].await(60, TimeUnit.SECONDS);
+            assertTrue("did not receive all notifications for iteration " + i,
+                       receivers[i].await(20, TimeUnit.SECONDS));
         }
     }
 }
