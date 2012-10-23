@@ -32,8 +32,6 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
-import org.mockito.internal.verification.Times;
-
 public class GossipTest extends TestCase {
 
     public void testApplyDiscover() throws Exception {
@@ -108,7 +106,7 @@ public class GossipTest extends TestCase {
 
         ReplicatedState state1 = new ReplicatedState(new UUID(666, 1),
                                                      new byte[] { 1 });
-        state1.setTime(1);
+        state1.setTime(0);
 
         ReplicatedState state2 = new ReplicatedState(new UUID(666, 2),
                                                      new byte[] { 2 });
@@ -116,21 +114,16 @@ public class GossipTest extends TestCase {
 
         ReplicatedState state3 = new ReplicatedState(new UUID(666, 3),
                                                      new byte[] { 3 });
-        state3.setTime(3);
+        state3.setTime(0);
 
         ReplicatedState state4 = new ReplicatedState(new UUID(666, 4),
                                                      new byte[] { 4 });
-        state4.setTime(1);
+        state4.setTime(5);
 
-        when(ep1.getTime()).thenReturn(0L);
-        when(ep1.getState()).thenReturn(state1);
-
-        when(ep2.getTime()).thenReturn(1L);
-
-        when(ep3.getTime()).thenReturn(0L);
-        when(ep3.getState()).thenReturn(state3);
-
-        when(ep4.getTime()).thenReturn(5L);
+        when(ep1.getState(state1.getId())).thenReturn(state1);
+        when(ep1.getState(state2.getId())).thenReturn(state2);
+        when(ep1.getState(state3.getId())).thenReturn(state3);
+        when(ep1.getState(state4.getId())).thenReturn(state4);
 
         Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
                                    random, 4, TimeUnit.DAYS) {
@@ -157,26 +150,23 @@ public class GossipTest extends TestCase {
         gossip.update(new Update(address3, state3), address3);
         gossip.update(new Update(address4, state4), address4);
 
-        verify(ep1, new Times(2)).getTime();
-        verify(ep1).record(state1);
-        verify(ep1).getState();
+        verify(ep1).getState(state1.getId());
         verifyNoMoreInteractions(ep1);
 
-        verify(ep2).getTime();
+        verify(ep2).getState(state2.getId());
+        verify(ep2).addState(state2);
         verifyNoMoreInteractions(ep2);
 
-        verify(ep3, new Times(2)).getTime();
-        verify(ep3).record(state3);
-        verify(ep3).getState();
+        verify(ep3).getState(state3.getId());
+        verify(ep3).addState(state3);
         verifyNoMoreInteractions(ep3);
 
-        verify(ep4).getTime();
+        verify(ep4).getState(state4.getId());
+        verify(ep4).addState(state4);
         verifyNoMoreInteractions(ep4);
 
         verify(communications).setGossip(gossip);
 
-        verify(receiver).update(state1.getId(), state1.getState());
-        verify(receiver).update(state3.getId(), state3.getState());
         verifyNoMoreInteractions(communications);
     }
 
@@ -190,19 +180,27 @@ public class GossipTest extends TestCase {
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
         when(view.getLocalAddress()).thenReturn(localAddress);
 
-        Digest digest1 = new Digest(new InetSocketAddress("google.com", 1), 3);
-        Digest digest2 = new Digest(new InetSocketAddress("google.com", 2), 1);
-        Digest digest3 = new Digest(new InetSocketAddress("google.com", 3), 1);
-        Digest digest4 = new Digest(new InetSocketAddress("google.com", 4), 3);
-        Digest digest1a = new Digest(new InetSocketAddress("google.com", 1), -1);
-        Digest digest2a = new Digest(new InetSocketAddress("google.com", 2), -1);
-        Digest digest3a = new Digest(new InetSocketAddress("google.com", 3), -1);
-        Digest digest4a = new Digest(new InetSocketAddress("google.com", 4), -1);
+        Digest digest1 = new Digest(new InetSocketAddress("google.com", 1),
+                                    new UUID(0, 1), 3);
+        Digest digest2 = new Digest(new InetSocketAddress("google.com", 2),
+                                    new UUID(0, 2), 1);
+        Digest digest3 = new Digest(new InetSocketAddress("google.com", 3),
+                                    new UUID(0, 3), 1);
+        Digest digest4 = new Digest(new InetSocketAddress("google.com", 4),
+                                    new UUID(0, 4), 3);
+        Digest digest1a = new Digest(new InetSocketAddress("google.com", 1),
+                                     new UUID(0, 1), -1);
+        Digest digest2a = new Digest(new InetSocketAddress("google.com", 2),
+                                     new UUID(0, 2), -1);
+        Digest digest3a = new Digest(new InetSocketAddress("google.com", 3),
+                                     new UUID(0, 3), -1);
+        Digest digest4a = new Digest(new InetSocketAddress("google.com", 4),
+                                     new UUID(0, 4), -1);
 
         Gossip gossip = new Gossip(listener, communications, view, fdFactory,
                                    random, 4, TimeUnit.DAYS);
 
-        gossip.examine(asList(digest1, digest2, digest3, digest4),
+        gossip.examine(new Digest[] { digest1, digest2, digest3, digest4 },
                        gossipHandler);
 
         verify(gossipHandler).reply(asList(digest1a, digest2a, digest3a,
@@ -226,13 +224,13 @@ public class GossipTest extends TestCase {
         InetSocketAddress address3 = new InetSocketAddress("127.0.0.1", 3);
         InetSocketAddress address4 = new InetSocketAddress("127.0.0.1", 4);
 
-        Digest digest1 = new Digest(address1, 2);
-        Digest digest2 = new Digest(address2, 1);
-        Digest digest3 = new Digest(address3, 4);
-        Digest digest4 = new Digest(address4, 3);
+        Digest digest1 = new Digest(address1, new UUID(666, 1), 2);
+        Digest digest2 = new Digest(address2, new UUID(666, 2), 1);
+        Digest digest3 = new Digest(address3, new UUID(666, 3), 4);
+        Digest digest4 = new Digest(address4, new UUID(666, 4), 3);
 
-        Digest digest1a = new Digest(address1, 1);
-        Digest digest3a = new Digest(address3, 3);
+        Digest digest1a = new Digest(address1, new UUID(666, 1), 1);
+        Digest digest3a = new Digest(address3, new UUID(666, 3), 3);
 
         ReplicatedState state1 = new ReplicatedState(new UUID(666, 1),
                                                      new byte[0]);
@@ -264,11 +262,12 @@ public class GossipTest extends TestCase {
         endpoints.put(address3, new Endpoint(address3, state3, fd));
         endpoints.put(address4, new Endpoint(address4, state4, fd));
 
-        gossip.examine(asList(digest1, digest2, digest3, digest4),
+        gossip.examine(new Digest[] { digest1, digest2, digest3, digest4 },
                        gossipHandler);
         verify(gossipHandler).reply(eq(asList(digest1a, digest3a)),
                                     eq(asList(new Update(address2, state2),
                                               new Update(address4, state4))));
+        // verify(gossipHandler, new Times(4)).getGossipper();
         verifyNoMoreInteractions(gossipHandler);
     }
 }
