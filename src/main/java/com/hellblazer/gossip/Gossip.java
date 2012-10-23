@@ -22,8 +22,10 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.UUID;
@@ -42,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.NoArgGenerator;
-import com.hellblazer.utils.collections.OaHashSet;
 
 /**
  * The embodiment of the gossip protocol. This protocol replicates state and
@@ -84,7 +85,7 @@ public class Gossip {
     private final int                                        interval;
     private final TimeUnit                                   intervalUnit;
     private final GossipListener                             listener;
-    private final OaHashSet<ReplicatedState>                 localState = new OaHashSet<ReplicatedState>();
+    private final Map<UUID, ReplicatedState>                 localState = new HashMap<UUID, ReplicatedState>();
     private final Ring                                       ring;
     private final AtomicBoolean                              running    = new AtomicBoolean();
     private final ScheduledExecutorService                   scheduler;
@@ -193,8 +194,7 @@ public class Gossip {
         ReplicatedState state = new ReplicatedState(id, new byte[0]);
         state.setTime(System.currentTimeMillis());
         synchronized (localState) {
-            localState.remove(state);
-            localState.add(state);
+            localState.put(id, state);
         }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s abandoning replicated state",
@@ -216,9 +216,8 @@ public class Gossip {
     public UUID register(byte[] replicatedState) {
         UUID id = idGenerator.generate();
         ReplicatedState state = new ReplicatedState(id, replicatedState);
-        state.setTime(System.currentTimeMillis());
         synchronized (localState) {
-            localState.add(state);
+            localState.put(id, state);
         }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s registering replicated state",
@@ -262,8 +261,7 @@ public class Gossip {
         ReplicatedState state = new ReplicatedState(id, replicatedState);
         state.setTime(System.currentTimeMillis());
         synchronized (localState) {
-            localState.remove(state);
-            localState.add(state);
+            localState.put(id, state);
         }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s updating replicated state",
@@ -288,19 +286,14 @@ public class Gossip {
         } else if (view.getLocalAddress().equals(digest.getAddress())) {
             if (ALL_STATES.equals(digest.getId())) {
                 synchronized (localState) {
-                    for (ReplicatedState s : localState) {
+                    for (ReplicatedState s : localState.values()) {
                         deltaState.add(new Update(digest.getAddress(), s));
                     }
                 }
             } else {
                 ReplicatedState state = null;
                 synchronized (localState) {
-                    for (ReplicatedState s : localState) {
-                        if (s.getId().equals(digest.getId())) {
-                            state = s;
-                            break;
-                        }
-                    }
+                    state = localState.get(digest.getId());
                 }
                 if (state != null && state.getTime() > digest.getTime()) {
                     deltaState.add(new Update(digest.getAddress(), state));
@@ -351,6 +344,7 @@ public class Gossip {
             log.trace("Culling the unreachable...");
         }
         view.cullUnreachable(now);
+        ring.update(endpoints.values());
     }
 
     /**
@@ -406,6 +400,7 @@ public class Gossip {
                     log.debug(format("Member %s is now CONNECTED",
                                      newEndpoint.getAddress()));
                 }
+                ring.update(endpoints.values());
                 List<Digest> newDigests = new ArrayList<Digest>(digests);
                 newDigests.add(new Digest(address, ALL_STATES, -1)); // We want it all, baby
                 newEndpoint.getHandler().gossip(newDigests);
@@ -448,6 +443,7 @@ public class Gossip {
                 for (ReplicatedState state : endpoint.getStates()) {
                     notifyRegister(state);
                 }
+                ring.update(endpoints.values());
             }
 
         };
@@ -516,7 +512,7 @@ public class Gossip {
      */
     private void updateAllLocalState(List<Update> deltaState) {
         synchronized (localState) {
-            for (ReplicatedState state : localState) {
+            for (ReplicatedState state : localState.values()) {
                 deltaState.add(new Update(getLocalAddress(), state));
             }
         }
@@ -707,7 +703,7 @@ public class Gossip {
             endpoint.addDigestsTo(digests);
         }
         synchronized (localState) {
-            for (ReplicatedState state : localState) {
+            for (ReplicatedState state : localState.values()) {
                 digests.add(new Digest(getLocalAddress(), state));
             }
         }
@@ -797,13 +793,13 @@ public class Gossip {
         if (endpoint != null) {
             ReplicatedState state = endpoint.getState(update.state.getId());
             if (state == null) {
-                endpoint.addState(update.state);
+                endpoint.updateState(update.state);
                 notifyRegister(update.state);
             } else {
                 // TODO this logic is quite slow and unnecessary
                 if (update.state.getTime() > state.getTime()) {
                     long oldTime = state.getTime();
-                    endpoint.record(update.state);
+                    endpoint.updateState(update.state);
                     notifyUpdate(state);
                     if (log.isTraceEnabled()) {
                         log.trace(format("Updating state time stamp to %s from %s for %s",

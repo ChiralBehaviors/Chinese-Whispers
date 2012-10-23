@@ -154,15 +154,15 @@ public class GossipTest extends TestCase {
         verifyNoMoreInteractions(ep1);
 
         verify(ep2).getState(state2.getId());
-        verify(ep2).addState(state2);
+        verify(ep2).updateState(state2);
         verifyNoMoreInteractions(ep2);
 
         verify(ep3).getState(state3.getId());
-        verify(ep3).addState(state3);
+        verify(ep3).updateState(state3);
         verifyNoMoreInteractions(ep3);
 
         verify(ep4).getState(state4.getId());
-        verify(ep4).addState(state4);
+        verify(ep4).updateState(state4);
         verifyNoMoreInteractions(ep4);
 
         verify(communications).setGossip(gossip);

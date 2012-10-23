@@ -30,12 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
-import com.hellblazer.gossip.FailureDetectorFactory;
-import com.hellblazer.gossip.Gossip;
-import com.hellblazer.gossip.GossipListener;
-import com.hellblazer.gossip.SystemView;
-import com.hellblazer.gossip.UdpCommunications;
-import com.hellblazer.gossip.fd.PhiFailureDetectorFactory;
+import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
 
 /**
  * Basic end to end testing
@@ -187,12 +182,13 @@ public class EndToEndTest extends TestCase {
         SystemView view = new SystemView(new Random(),
                                          communications.getLocalAddress(),
                                          seedHosts, 5000, 500000);
-        FailureDetectorFactory fdFactory = new PhiFailureDetectorFactory(11,
-                                                                         1000,
-                                                                         3000,
-                                                                         1,
-                                                                         1.0,
-                                                                         true);
+        FailureDetectorFactory fdFactory = new AdaptiveFailureDetectorFactory(
+                                                                              0.8,
+                                                                              100,
+                                                                              1.1,
+                                                                              30000,
+                                                                              30,
+                                                                              1.0);
         Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
                                    new Random(), 1, TimeUnit.SECONDS);
         return gossip;

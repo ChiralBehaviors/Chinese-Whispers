@@ -30,11 +30,32 @@ public class AdaptiveFailureDetectorFactory implements FailureDetectorFactory {
     private final double minimumInterval;
     private final double scale;
 
+    /**
+     * 
+     * @param convictionThreshold
+     *            - the level of certainty that must be met before conviction.
+     *            This value must be <= 1.0
+     * @param windowSize
+     *            - the number of samples in the window
+     * @param scale
+     *            - a scale factor to accomidate the real world
+     * @param expectedSampleInterval
+     *            - the expected sample interval, used to prime the detector
+     * @param initialSamples
+     *            - the number of initial samples to prime the detector
+     * @param minimumInterval
+     *            - the minimum inter arival interval
+     */
     public AdaptiveFailureDetectorFactory(double convictionThreshold,
                                           int windowSize, double scale,
                                           long expectedSampleInterval,
                                           int initialSamples,
                                           double minimumInterval) {
+        if (convictionThreshold > 1.0) {
+            throw new IllegalArgumentException(
+                                               String.format("Conviction threshold %s must be <= 1.0",
+                                                             convictionThreshold));
+        }
         this.convictionThreshold = convictionThreshold;
         this.windowSize = windowSize;
         this.expectedSampleInterval = expectedSampleInterval;

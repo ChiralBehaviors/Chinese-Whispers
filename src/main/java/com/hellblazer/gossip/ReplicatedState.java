@@ -34,6 +34,7 @@ public class ReplicatedState {
     public ReplicatedState(UUID id, byte[] state) {
         this.id = id;
         this.state = state;
+        time = System.currentTimeMillis();
     }
 
     /**

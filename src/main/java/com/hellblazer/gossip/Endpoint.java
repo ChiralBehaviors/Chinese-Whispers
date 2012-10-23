@@ -20,15 +20,15 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hellblazer.utils.collections.OaHashSet;
-
 /**
- * The Endpoint keeps track of the heartbeat state and the failure detector for
+ * The Endpoint keeps track of the replicated state and the failure detector for
  * remote clients
  * 
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
@@ -77,7 +77,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     private final FailureDetector            fd;
     private volatile GossipMessages          handler;
-    private final OaHashSet<ReplicatedState> states  = new OaHashSet<ReplicatedState>();
+    private final Map<UUID, ReplicatedState> states  = new HashMap<UUID, ReplicatedState>();
     private volatile boolean                 isAlive = true;
     private final InetSocketAddress          address;
 
@@ -89,7 +89,7 @@ public class Endpoint implements Comparable<Endpoint> {
     public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
                     FailureDetector failureDetector) {
         this(address, failureDetector);
-        states.add(replicatedState);
+        states.put(replicatedState.getId(), replicatedState);
     }
 
     /**
@@ -97,7 +97,7 @@ public class Endpoint implements Comparable<Endpoint> {
      */
     public void addDigestsTo(ArrayList<Digest> digests) {
         synchronized (states) {
-            for (ReplicatedState state : states) {
+            for (ReplicatedState state : states.values()) {
                 digests.add(new Digest(address, state));
             }
         }
@@ -129,13 +129,8 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public ReplicatedState getState(UUID id) {
         synchronized (states) {
-            for (ReplicatedState state : states) {
-                if (id.equals(state.getId())) {
-                    return state;
-                }
-            }
+            return states.get(id);
         }
-        return null;
     }
 
     public long getTime(UUID id) {
@@ -163,15 +158,6 @@ public class Endpoint implements Comparable<Endpoint> {
         isAlive = false;
     }
 
-    public void record(ReplicatedState newState) {
-        synchronized (states) {
-            states.remove(newState);
-            states.add(newState);
-        }
-        fd.record(newState.getTime(),
-                  System.currentTimeMillis() - newState.getTime());
-    }
-
     public void setCommunications(GossipMessages communications) {
         handler = communications;
     }
@@ -196,8 +182,11 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public void updateState(ReplicatedState newState) {
         synchronized (states) {
-            states.remove(newState);
-            states.add(newState);
+            states.put(newState.getId(), newState);
+        }
+        if (fd != null) {
+            fd.record(newState.getTime(),
+                      System.currentTimeMillis() - newState.getTime());
         }
         if (logger.isTraceEnabled()) {
             logger.trace(String.format("new replicated state time: %s",
@@ -210,16 +199,7 @@ public class Endpoint implements Comparable<Endpoint> {
      */
     public Collection<ReplicatedState> getStates() {
         synchronized (states) {
-            return new ArrayList<ReplicatedState>(states);
-        }
-    }
-
-    /**
-     * @param state
-     */
-    public void addState(ReplicatedState state) {
-        synchronized (states) {
-            states.add(state);
+            return new ArrayList<ReplicatedState>(states.values());
         }
     }
 }
