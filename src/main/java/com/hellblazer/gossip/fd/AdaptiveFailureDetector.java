@@ -113,8 +113,9 @@ public class AdaptiveFailureDetector extends MultiWindow implements
      */
     private double countLessThanEqualTo(double delta) {
         int deltaCount = 0;
-        for (double[] element : this) {
-            if (element[0] <= delta) {
+        for (int i = 0; i < count; i++) {
+
+            if ((samples[(i + head) % samples.length][0]) <= delta) {
                 deltaCount++;
             }
         }
