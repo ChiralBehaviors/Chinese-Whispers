@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,11 +76,12 @@ public class Endpoint implements Comparable<Endpoint> {
         bytes.putInt(ipaddress.getPort());
     }
 
+    private final InetSocketAddress          address;
     private final FailureDetector            fd;
     private volatile GossipMessages          handler;
-    private final Map<UUID, ReplicatedState> states  = new HashMap<UUID, ReplicatedState>();
-    private volatile boolean                 isAlive = true;
-    private final InetSocketAddress          address;
+    private volatile boolean                 isAlive   = true;
+    private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
+    private final AtomicInteger              suspected = new AtomicInteger(0);
 
     public Endpoint(InetSocketAddress address, FailureDetector failureDetector) {
         this.address = address;
@@ -133,6 +135,15 @@ public class Endpoint implements Comparable<Endpoint> {
         }
     }
 
+    /**
+     * @return
+     */
+    public Collection<ReplicatedState> getStates() {
+        synchronized (states) {
+            return new ArrayList<ReplicatedState>(states.values());
+        }
+    }
+
     public long getTime(UUID id) {
         ReplicatedState state = getState(id);
         if (state == null) {
@@ -164,15 +175,21 @@ public class Endpoint implements Comparable<Endpoint> {
 
     /**
      * Answer true if the suspicion level of the failure detector is greater
-     * than the conviction threshold
+     * than the conviction threshold.
      * 
      * @param now
      *            - the time at which to base the measurement
+     * @param cleanUp
+     *            - the number of cycles of #fail required before conviction
      * @return true if the suspicion level of the failure detector is greater
      *         than the conviction threshold
      */
-    public boolean shouldConvict(long now) {
-        return fd.shouldConvict(now);
+    public boolean shouldConvict(long now, int cleanUp) {
+        if (fd.shouldConvict(now)) {
+            return suspected.incrementAndGet() >= cleanUp;
+        }
+        suspected.set(0);
+        return false;
     }
 
     @Override
@@ -191,15 +208,6 @@ public class Endpoint implements Comparable<Endpoint> {
         if (logger.isTraceEnabled()) {
             logger.trace(String.format("new replicated state time: %s",
                                        newState.getTime()));
-        }
-    }
-
-    /**
-     * @return
-     */
-    public Collection<ReplicatedState> getStates() {
-        synchronized (states) {
-            return new ArrayList<ReplicatedState>(states.values());
         }
     }
 }

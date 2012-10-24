@@ -15,7 +15,6 @@
 package com.hellblazer.gossip.fd;
 
 import com.hellblazer.gossip.FailureDetector;
-import com.hellblazer.utils.collections.SkipList;
 import com.hellblazer.utils.windows.MultiWindow;
 
 /**
@@ -29,12 +28,11 @@ import com.hellblazer.utils.windows.MultiWindow;
 public class AdaptiveFailureDetector extends MultiWindow implements
         FailureDetector {
 
-    private double         last        = -1.0;
-    private final double   minInterval;
-    private final double   scale;
-    private final SkipList sorted      = new SkipList();
-    private final double   threshold;
-    private double         sumOfDelays = 0.0;
+    private double       last        = -1.0;
+    private final double minInterval;
+    private final double scale;
+    private final double threshold;
+    private double       sumOfDelays = 0.0;
 
     /**
      * 
@@ -70,33 +68,56 @@ public class AdaptiveFailureDetector extends MultiWindow implements
         for (int i = 0; i < initialSamples; i++) {
             record((long) (last + expectedSampleInterval), 0L);
         }
-        assert last == now;
+        last = -1.0;
     }
 
     @Override
     public synchronized void record(long timeStamp, long delay) {
         if (last >= 0.0) {
             double sample = timeStamp - last;
-            if (sample < minInterval) {
-                return;
+            if (sample > minInterval) {
+                sumOfDelays += delay;
+                if (count == samples.length) {
+                    double[] removed = removeFirst();
+                    sumOfDelays -= removed[1];
+                }
+                addLast(sample, delay);
             }
-            sorted.add(sample);
-            sumOfDelays += delay;
-            if (count == samples.length) {
-                double[] removed = removeFirst();
-                sorted.remove(removed[0]);
-                sumOfDelays -= removed[1];
-            }
-            addLast(sample, delay);
         }
-        last = timeStamp + sumOfDelays / count;
+        double averageDelay = count == 0 ? 0.0 : sumOfDelays / count;
+        last = timeStamp + averageDelay;
     }
 
     @Override
     public synchronized boolean shouldConvict(long now) {
-        double delta = (now - last) * scale;
-        double countLessThanEqualTo = sorted.countLessThanEqualTo(delta);
-        boolean convict = countLessThanEqualTo / count >= threshold;
+        if (last < 0) {
+            return false;
+        }
+
+        double delta = (now - last - (sumOfDelays / count)) * scale;
+        double countLessThanEqualTo = countLessThanEqualTo(delta);
+        double probability = countLessThanEqualTo / count;
+        boolean convict = probability >= threshold;
+        /*
+        if (convict) {
+            System.out.println(String.format("delta: %s, count: %s, size: %s, probability: %s, window: %s",
+                                             delta, countLessThanEqualTo,
+                                             count, probability, sorted));
+        }*/
         return convict;
+    }
+
+    /**
+     * @param delta
+     * @return
+     */
+    private double countLessThanEqualTo(double delta) {
+        int deltaCount = 0;
+        for (double[] element : this) {
+            if (element[0] <= delta) {
+                deltaCount++;
+            }
+        }
+        return deltaCount;
     }
 }

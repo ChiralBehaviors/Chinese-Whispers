@@ -26,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
@@ -39,21 +40,23 @@ import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
  * 
  */
 public class EndToEndTest extends TestCase {
+    private static final AtomicInteger count        = new AtomicInteger();
+    private static final AtomicBoolean deregistered = new AtomicBoolean(false);
 
-    private static class Receiver implements GossipListener {
-        private static final AtomicInteger count = new AtomicInteger();
+    private class Receiver implements GossipListener {
 
-        private final CountDownLatch[]     latches;
+        private final CountDownLatch[] latches;
 
         Receiver(int members, int id) {
-            super();
             latches = new CountDownLatch[members];
             setLatches(id);
         }
 
         @Override
         public void deregister(UUID id) {
-            throw new IllegalStateException("Should never have abandoned");
+            System.err.println(String.format("Sould never have abandoned state %s",
+                                             id));
+            deregistered.set(true);
         }
 
         public boolean await(int timeout, TimeUnit unit)
@@ -155,6 +158,7 @@ public class EndToEndTest extends TestCase {
                 member.terminate();
             }
         }
+        assertFalse("state was deregistered", deregistered.get());
     }
 
     protected Gossip createCommunications(GossipListener receiver,
@@ -183,14 +187,14 @@ public class EndToEndTest extends TestCase {
                                          communications.getLocalAddress(),
                                          seedHosts, 5000, 500000);
         FailureDetectorFactory fdFactory = new AdaptiveFailureDetectorFactory(
-                                                                              0.8,
+                                                                              0.9,
                                                                               100,
-                                                                              1.1,
-                                                                              30000,
-                                                                              30,
-                                                                              1.0);
+                                                                              0.8,
+                                                                              10000,
+                                                                              10,
+                                                                              3000);
         Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
-                                   new Random(), 1, TimeUnit.SECONDS);
+                                   new Random(), 1, TimeUnit.SECONDS, 3);
         return gossip;
     }
 
