@@ -53,14 +53,6 @@ public interface GossipCommunications {
     InetSocketAddress getLocalAddress();
 
     /**
-     * Send the replicated state around the ring via the left members
-     * 
-     * @param state
-     * @param inetSocketAddress
-     */
-    void update(Update state, InetSocketAddress inetSocketAddress);
-
-    /**
      * Set the gossip service
      * 
      * @param gossip
@@ -76,4 +68,12 @@ public interface GossipCommunications {
      * Tereminate the communications service
      */
     void terminate();
+
+    /**
+     * Send the replicated state around the ring via the left members
+     * 
+     * @param state
+     * @param inetSocketAddress
+     */
+    void update(Update state, InetSocketAddress inetSocketAddress);
 }

@@ -29,6 +29,11 @@ public class Update {
     public final InetSocketAddress node;
     public final ReplicatedState   state;
 
+    public Update(ByteBuffer buffer) throws UnknownHostException {
+        node = readInetAddress(buffer);
+        state = new ReplicatedState(buffer);
+    }
+
     /**
      * @param node
      * @param state
@@ -38,14 +43,36 @@ public class Update {
         this.state = state;
     }
 
-    public Update(ByteBuffer buffer) throws UnknownHostException {
-        node = readInetAddress(buffer);
-        state = new ReplicatedState(buffer);
-    }
-
-    public void writeTo(ByteBuffer buffer) {
-        writeInetAddress(node, buffer);
-        state.writeTo(buffer);
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        Update other = (Update) obj;
+        if (node == null) {
+            if (other.node != null) {
+                return false;
+            }
+        } else if (!node.equals(other.node)) {
+            return false;
+        }
+        if (state == null) {
+            if (other.state != null) {
+                return false;
+            }
+        } else if (!state.equals(other.state)) {
+            return false;
+        }
+        return true;
     }
 
     /* (non-Javadoc)
@@ -55,34 +82,9 @@ public class Update {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((node == null) ? 0 : node.hashCode());
-        result = prime * result + ((state == null) ? 0 : state.hashCode());
+        result = prime * result + (node == null ? 0 : node.hashCode());
+        result = prime * result + (state == null ? 0 : state.hashCode());
         return result;
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#equals(java.lang.Object)
-     */
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        Update other = (Update) obj;
-        if (node == null) {
-            if (other.node != null)
-                return false;
-        } else if (!node.equals(other.node))
-            return false;
-        if (state == null) {
-            if (other.state != null)
-                return false;
-        } else if (!state.equals(other.state))
-            return false;
-        return true;
     }
 
     /* (non-Javadoc)
@@ -92,5 +94,10 @@ public class Update {
     public String toString() {
         return "Update [" + node + ", " + state.getId() + ", "
                + state.getTime() + "]";
+    }
+
+    public void writeTo(ByteBuffer buffer) {
+        writeInetAddress(node, buffer);
+        state.writeTo(buffer);
     }
 }

@@ -28,6 +28,17 @@ public class ReplicatedState {
     private volatile long time = -1L;
 
     /**
+     * @param buffer
+     * @throws UnknownHostException
+     */
+    public ReplicatedState(ByteBuffer buffer) {
+        time = buffer.getLong();
+        id = new UUID(buffer.getLong(), buffer.getLong());
+        state = new byte[buffer.remaining()];
+        buffer.get(state);
+    }
+
+    /**
      * @param id
      * @param state
      */
@@ -37,15 +48,29 @@ public class ReplicatedState {
         time = System.currentTimeMillis();
     }
 
-    /**
-     * @param buffer
-     * @throws UnknownHostException
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
      */
-    public ReplicatedState(ByteBuffer buffer) {
-        time = buffer.getLong();
-        id = new UUID(buffer.getLong(), buffer.getLong());
-        state = new byte[buffer.remaining()];
-        buffer.get(state);
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        ReplicatedState other = (ReplicatedState) obj;
+        if (id == null) {
+            if (other.id != null) {
+                return false;
+            }
+        } else if (!id.equals(other.id)) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -69,22 +94,23 @@ public class ReplicatedState {
         return time;
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + (id == null ? 0 : id.hashCode());
+        return result;
+    }
+
     /**
      * @param time
      *            the time to set
      */
     public void setTime(long time) {
         this.time = time;
-    }
-
-    /**
-     * @param buffer
-     */
-    public void writeTo(ByteBuffer buffer) {
-        buffer.putLong(time);
-        buffer.putLong(id.getMostSignificantBits());
-        buffer.putLong(id.getLeastSignificantBits());
-        buffer.put(state);
     }
 
     /* (non-Javadoc)
@@ -95,34 +121,13 @@ public class ReplicatedState {
         return String.format("ReplicatedState [id=%s, time=%s]", id, time);
     }
 
-    /* (non-Javadoc)
-     * @see java.lang.Object#hashCode()
+    /**
+     * @param buffer
      */
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((id == null) ? 0 : id.hashCode());
-        return result;
-    }
-
-    /* (non-Javadoc)
-     * @see java.lang.Object#equals(java.lang.Object)
-     */
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        ReplicatedState other = (ReplicatedState) obj;
-        if (id == null) {
-            if (other.id != null)
-                return false;
-        } else if (!id.equals(other.id))
-            return false;
-        return true;
+    public void writeTo(ByteBuffer buffer) {
+        buffer.putLong(time);
+        buffer.putLong(id.getMostSignificantBits());
+        buffer.putLong(id.getLeastSignificantBits());
+        buffer.put(state);
     }
 }

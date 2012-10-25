@@ -94,7 +94,7 @@ public class AdaptiveFailureDetector extends MultiWindow implements
             return false;
         }
 
-        double delta = (now - last - (sumOfDelays / count)) * scale;
+        double delta = (now - last - sumOfDelays / count) * scale;
         double countLessThanEqualTo = countLessThanEqualTo(delta);
         double probability = countLessThanEqualTo / count;
         boolean convict = probability >= threshold;
@@ -115,7 +115,7 @@ public class AdaptiveFailureDetector extends MultiWindow implements
         int deltaCount = 0;
         for (int i = 0; i < count; i++) {
 
-            if ((samples[(i + head) % samples.length][0]) <= delta) {
+            if (samples[(i + head) % samples.length][0] <= delta) {
                 deltaCount++;
             }
         }

@@ -40,9 +40,6 @@ import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
  * 
  */
 public class EndToEndTest extends TestCase {
-    private static final AtomicInteger count        = new AtomicInteger();
-    private static final AtomicBoolean deregistered = new AtomicBoolean(false);
-
     private class Receiver implements GossipListener {
 
         private final CountDownLatch[] latches;
@@ -50,13 +47,6 @@ public class EndToEndTest extends TestCase {
         Receiver(int members, int id) {
             latches = new CountDownLatch[members];
             setLatches(id);
-        }
-
-        @Override
-        public void deregister(UUID id) {
-            System.err.println(String.format("Sould never have abandoned state %s",
-                                             id));
-            deregistered.set(true);
         }
 
         public boolean await(int timeout, TimeUnit unit)
@@ -67,6 +57,13 @@ public class EndToEndTest extends TestCase {
                 }
             }
             return true;
+        }
+
+        @Override
+        public void deregister(UUID id) {
+            System.err.println(String.format("Sould never have abandoned state %s",
+                                             id));
+            deregistered.set(true);
         }
 
         @Override
@@ -105,7 +102,11 @@ public class EndToEndTest extends TestCase {
         }
     }
 
-    private UUID[] stateIds;
+    private static final AtomicInteger count        = new AtomicInteger();
+
+    private static final AtomicBoolean deregistered = new AtomicBoolean(false);
+
+    private UUID[]                     stateIds;
 
     public void testEnd2End() throws Exception {
         int membership = 64;

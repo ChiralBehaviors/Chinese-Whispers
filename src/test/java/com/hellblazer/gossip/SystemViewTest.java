@@ -22,8 +22,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Random;
 
-import com.hellblazer.gossip.SystemView;
-
 import junit.framework.TestCase;
 
 /**

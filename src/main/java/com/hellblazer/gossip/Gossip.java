@@ -14,6 +14,7 @@
  */
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.GossipListener.MAX_STATE_SIZE;
 import static java.lang.String.format;
 
 import java.io.IOException;
@@ -119,6 +120,34 @@ public class Gossip {
 
     /**
      * 
+     * @param stateListener
+     *            - the ultimate listener of available gossip
+     * @param systemView
+     *            - the system management view of the member state
+     * @param failureDetectorFactory
+     *            - the factory producing instances of the failure detector
+     * @param random
+     *            - a source of entropy
+     * @param gossipInterval
+     *            - the period of the random gossiping
+     * @param unit
+     *            - time unit for the gossip interval
+     * @param cleanupCycles
+     *            - the number of gossip cycles required to convict a failing
+     *            endpoint
+     */
+    public Gossip(GossipListener stateListener,
+                  GossipCommunications communicationsService,
+                  SystemView systemView,
+                  FailureDetectorFactory failureDetectorFactory, Random random,
+                  int gossipInterval, TimeUnit unit, int cleanupCycles) {
+        this(Generators.timeBasedGenerator(), stateListener,
+             communicationsService, systemView, failureDetectorFactory, random,
+             gossipInterval, unit, 3);
+    }
+
+    /**
+     * 
      * @param idGenerator
      *            - the UUID generator for state ids on this node
      * @param stateListener
@@ -217,39 +246,15 @@ public class Gossip {
     }
 
     /**
-     * 
-     * @param stateListener
-     *            - the ultimate listener of available gossip
-     * @param systemView
-     *            - the system management view of the member state
-     * @param failureDetectorFactory
-     *            - the factory producing instances of the failure detector
-     * @param random
-     *            - a source of entropy
-     * @param gossipInterval
-     *            - the period of the random gossiping
-     * @param unit
-     *            - time unit for the gossip interval
-     * @param cleanupCycles
-     *            - the number of gossip cycles required to convict a failing
-     *            endpoint
-     */
-    public Gossip(GossipListener stateListener,
-                  GossipCommunications communicationsService,
-                  SystemView systemView,
-                  FailureDetectorFactory failureDetectorFactory, Random random,
-                  int gossipInterval, TimeUnit unit, int cleanupCycles) {
-        this(Generators.timeBasedGenerator(), stateListener,
-             communicationsService, systemView, failureDetectorFactory, random,
-             gossipInterval, unit, 3);
-    }
-
-    /**
      * Deregister the replicated state of this node identified by the id
      * 
      * @param id
      */
     public void deregister(UUID id) {
+        if (id == null) {
+            throw new NullPointerException(
+                                           "replicated state id must not be null");
+        }
         ReplicatedState state = new ReplicatedState(id, new byte[0]);
         state.setTime(System.currentTimeMillis());
         synchronized (localState) {
@@ -273,6 +278,15 @@ public class Gossip {
      * @return the unique identifier for this state
      */
     public UUID register(byte[] replicatedState) {
+        if (replicatedState == null) {
+            throw new NullPointerException("replicated state must not be null");
+        }
+        if (replicatedState.length > MAX_STATE_SIZE) {
+            throw new IllegalArgumentException(
+                                               String.format("State size %s must not be > %s",
+                                                             replicatedState.length,
+                                                             MAX_STATE_SIZE));
+        }
         UUID id = idGenerator.generate();
         ReplicatedState state = new ReplicatedState(id, replicatedState);
         synchronized (localState) {
@@ -317,6 +331,19 @@ public class Gossip {
      * @param replicatedState
      */
     public void update(UUID id, byte[] replicatedState) {
+        if (id == null) {
+            throw new NullPointerException(
+                                           "replicated state id must not be null");
+        }
+        if (replicatedState == null) {
+            throw new NullPointerException("replicated state must not be null");
+        }
+        if (replicatedState.length > MAX_STATE_SIZE) {
+            throw new IllegalArgumentException(
+                                               String.format("State size %s must not be > %s",
+                                                             replicatedState.length,
+                                                             MAX_STATE_SIZE));
+        }
         ReplicatedState state = new ReplicatedState(id, replicatedState);
         state.setTime(System.currentTimeMillis());
         synchronized (localState) {

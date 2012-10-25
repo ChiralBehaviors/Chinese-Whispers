@@ -14,9 +14,10 @@
  */
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
+
 import java.net.SocketAddress;
 import java.util.List;
-import static com.hellblazer.gossip.HMAC.*;
 
 /**
  * The communications interface used by the gossip protocol

@@ -19,7 +19,6 @@ import java.util.Random;
 import junit.framework.TestCase;
 
 import com.hellblazer.gossip.FailureDetector;
-import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
 
 public class AdaptiveFailureDetectorTest extends TestCase {
 

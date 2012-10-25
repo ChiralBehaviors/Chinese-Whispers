@@ -26,9 +26,11 @@
 
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.GossipMessages.MAX_SEG_SIZE;
+import static com.hellblazer.gossip.GossipMessages.UPDATE_HEADER_BYTE_SIZE;
+import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
+
 import java.util.UUID;
-import static com.hellblazer.gossip.GossipMessages.*;
-import static com.hellblazer.gossip.HMAC.*;
 
 /**
  * @author hhildebrand
@@ -37,6 +39,14 @@ import static com.hellblazer.gossip.HMAC.*;
 public interface GossipListener {
 
     int MAX_STATE_SIZE = MAX_SEG_SIZE - MAC_BYTE_SIZE - UPDATE_HEADER_BYTE_SIZE;
+
+    /**
+     * Previously known state has been abandoned
+     * 
+     * @param id
+     *            - the id of the state that has been aba
+     */
+    void deregister(UUID id);
 
     /**
      * The state is newly discovered
@@ -57,12 +67,4 @@ public interface GossipListener {
      *            - the updated content of the state
      */
     void update(UUID id, byte[] state);
-
-    /**
-     * Previously known state has been abandoned
-     * 
-     * @param id
-     *            - the id of the state that has been aba
-     */
-    void deregister(UUID id);
 }
