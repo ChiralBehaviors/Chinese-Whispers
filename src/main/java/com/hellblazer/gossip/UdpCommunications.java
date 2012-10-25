@@ -15,12 +15,14 @@
 package com.hellblazer.gossip;
 
 import static com.hellblazer.gossip.GossipMessages.DATA_POSITION;
-import static com.hellblazer.gossip.GossipMessages.DIGEST_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.GOSSIP;
+import static com.hellblazer.gossip.GossipMessages.MAGIC;
+import static com.hellblazer.gossip.GossipMessages.MAGIC_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.MAX_SEG_SIZE;
 import static com.hellblazer.gossip.GossipMessages.REPLY;
 import static com.hellblazer.gossip.GossipMessages.RING;
 import static com.hellblazer.gossip.GossipMessages.UPDATE;
+import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
 import static java.lang.Math.min;
 import static java.lang.String.format;
 
@@ -40,6 +42,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.crypto.ShortBufferException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,17 +57,23 @@ import com.hellblazer.utils.HexDump;
  * 
  */
 public class UdpCommunications implements GossipCommunications {
+
     private class GossipHandler implements GossipMessages {
         private final InetSocketAddress gossipper;
 
         GossipHandler(InetSocketAddress target) {
             assert target.getPort() != 0 : "Invalid port";
-            this.gossipper = target;
+            gossipper = target;
         }
 
         @Override
         public void close() {
             // no op
+        }
+
+        @Override
+        public SocketAddress getGossipper() {
+            return gossipper;
         }
 
         @Override
@@ -94,7 +104,6 @@ public class UdpCommunications implements GossipCommunications {
             for (int i = 0; i < digests.size();) {
                 byte count = (byte) min(MAX_DIGESTS, digests.size() - i);
                 buffer.position(DATA_POSITION);
-                buffer.put(messageType);
                 buffer.put(count);
                 int position;
                 for (Digest digest : digests.subList(i, i + count)) {
@@ -102,16 +111,11 @@ public class UdpCommunications implements GossipCommunications {
                     position = buffer.position();
                     Integer.toString(position);
                 }
-                send(buffer, gossipper);
+                send(messageType, buffer, gossipper);
                 i += count;
                 buffer.clear();
             }
             bufferPool.free(buffer);
-        }
-
-        @Override
-        public SocketAddress getGossipper() {
-            return gossipper;
         }
 
     }
@@ -119,14 +123,10 @@ public class UdpCommunications implements GossipCommunications {
     private static final int    DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
     private static final int    DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
     private static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
-    private static final int    MAGIC_NUMBER                      = 0xCAFEBABE;
-    private static final int    MAX_DIGESTS                       = (MAX_SEG_SIZE
-                                                                     - DATA_POSITION - 1)
-                                                                    / DIGEST_BYTE_SIZE;
 
-    private static String prettyPrint(SocketAddress sender,
-                                      SocketAddress target, byte[] bytes,
-                                      int length) {
+    public static String prettyPrint(SocketAddress sender,
+                                     SocketAddress target, byte[] bytes,
+                                     int length) {
         final StringBuilder sb = new StringBuilder(length * 2);
         sb.append('\n');
         sb.append(new SimpleDateFormat().format(new Date()));
@@ -141,7 +141,7 @@ public class UdpCommunications implements GossipCommunications {
         return sb.toString();
     }
 
-    private static String toHex(byte[] data, int offset, int length) {
+    public static String toHex(byte[] data, int offset, int length) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
         PrintStream stream = new PrintStream(baos);
         HexDump.hexdump(stream, data, offset, length);
@@ -149,25 +149,33 @@ public class UdpCommunications implements GossipCommunications {
         return baos.toString();
     }
 
-    private final ByteBufferPool  bufferPool = new ByteBufferPool("UDP Comms",
-                                                                  100);
-    private final ExecutorService dispatcher;
-    private Gossip                gossip;
-    private final AtomicBoolean   running    = new AtomicBoolean();
-
-    private final DatagramSocket  socket;
-    private InetSocketAddress     localAddress;
+    private final ByteBufferPool    bufferPool = new ByteBufferPool(
+                                                                    "UDP Comms",
+                                                                    100);
+    private final ExecutorService   dispatcher;
+    private Gossip                  gossip;
+    private final HMAC              hmac;
+    private final InetSocketAddress localAddress;
+    private final AtomicBoolean     running    = new AtomicBoolean();
+    private final DatagramSocket    socket;
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor) {
         this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER);
+             DEFAULT_SEND_BUFFER_MULTIPLIER, new HMAC());
+    }
+
+    public UdpCommunications(InetSocketAddress endpoint,
+                             ExecutorService executor, HMAC mac) {
+        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
+             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier) {
+                             int sendBufferMultiplier, HMAC mac) {
+        hmac = mac;
         dispatcher = executor;
         try {
             socket = new DatagramSocket(endpoint.getPort(),
@@ -351,22 +359,35 @@ public class UdpCommunications implements GossipCommunications {
      * @param target
      * @throws IOException
      */
-    private void send(ByteBuffer buffer, SocketAddress target) {
+    private void send(byte msgType, ByteBuffer buffer, SocketAddress target) {
         if (socket.isClosed()) {
             log.trace(String.format("Sending on a closed socket"));
             return;
         }
-        int length = buffer.position();
-        if (length == 6)
-            System.out.println("Ruh Roh");
-        buffer.putInt(0, MAGIC_NUMBER);
+        int msgLength = buffer.position();
+        int totalLength = msgLength + MAC_BYTE_SIZE;
+        buffer.putInt(0, MAGIC);
+        buffer.put(MAGIC_BYTE_SIZE, msgType);
+        byte[] bytes = buffer.array();
         try {
-            byte[] bytes = buffer.array();
-            DatagramPacket packet = new DatagramPacket(bytes, length, target);
+            hmac.addMAC(bytes, 0, msgLength);
+        } catch (ShortBufferException e) {
+            log.error("Invalid message %s",
+                      prettyPrint(getLocalAddress(), target, buffer.array(),
+                                  msgLength));
+            return;
+        } catch (SecurityException e) {
+            log.error("No key provided for HMAC");
+            return;
+        }
+        try {
+            DatagramPacket packet = new DatagramPacket(bytes, totalLength,
+                                                       target);
             if (log.isTraceEnabled()) {
-                log.trace(String.format("sending packet %s",
+                log.trace(String.format("sending packet mac start: %s %s",
+                                        msgLength,
                                         prettyPrint(getLocalAddress(), target,
-                                                    buffer.array(), length)));
+                                                    buffer.array(), totalLength)));
             }
             socket.send(packet);
         } catch (SocketException e) {
@@ -411,7 +432,17 @@ public class UdpCommunications implements GossipCommunications {
                               + packet.getSocketAddress());
                 }
                 int magic = buffer.getInt();
-                if (MAGIC_NUMBER == magic) {
+                if (MAGIC == magic) {
+                    try {
+                        hmac.checkMAC(buffer.array(), 0, packet.getLength()
+                                                         - MAC_BYTE_SIZE);
+                    } catch (SecurityException e) {
+                        if (log.isWarnEnabled()) {
+                            log.warn(format("Error processing inbound message on: %s, HMAC does not check",
+                                            getLocalAddress()), e);
+                        }
+                        return;
+                    }
                     try {
                         processInbound((InetSocketAddress) packet.getSocketAddress(),
                                        buffer);
@@ -480,8 +511,7 @@ public class UdpCommunications implements GossipCommunications {
         buffer.clear();
         buffer.order(ByteOrder.BIG_ENDIAN);
         buffer.position(DATA_POSITION);
-        buffer.put(msg);
         state.writeTo(buffer);
-        send(buffer, address);
+        send(msg, buffer, address);
     }
 }

@@ -16,6 +16,7 @@ package com.hellblazer.gossip;
 
 import java.net.SocketAddress;
 import java.util.List;
+import static com.hellblazer.gossip.HMAC.*;
 
 /**
  * The communications interface used by the gossip protocol
@@ -30,21 +31,45 @@ public interface GossipMessages {
      * semantics are atomic (no fragmentation in the network).
      */
     int  MAX_SEG_SIZE               = 1500;
-    int  DATA_POSITION              = 4;
+    int  BYTE_SIZE                  = 1;
+    int  INT_BYTE_SIZE              = 4;
+    int  LONG_BYTE_SIZE             = INT_BYTE_SIZE + INT_BYTE_SIZE;
+    int  MAGIC_BYTE_SIZE            = INT_BYTE_SIZE;
+    int  UUID_BYTE_SIZE             = LONG_BYTE_SIZE + LONG_BYTE_SIZE;
+    int  MESSAGE_TYPE_BYTE_SIZE     = BYTE_SIZE;
+    int  MESSAGE_HEADER_BYTE_SIZE   = MAGIC_BYTE_SIZE + MESSAGE_TYPE_BYTE_SIZE;
+    int  PAYLOAD_BYTE_SIZE          = MAX_SEG_SIZE - MESSAGE_HEADER_BYTE_SIZE
+                                      - MAC_BYTE_SIZE;
+    int  INET_ADDRESS_MAX_BYTE_SIZE = INT_BYTE_SIZE // address 
+                                      + INT_BYTE_SIZE;                         // port 
+    int  DATA_POSITION              = MESSAGE_HEADER_BYTE_SIZE;
+    int  DIGEST_BYTE_SIZE           = INET_ADDRESS_MAX_BYTE_SIZE // address
+                                      + UUID_BYTE_SIZE // UUID
+                                      + LONG_BYTE_SIZE;                        // timestamp
+    int  UPDATE_HEADER_BYTE_SIZE    = MESSAGE_HEADER_BYTE_SIZE
+                                      + INET_ADDRESS_MAX_BYTE_SIZE // endpoint address
+                                      + LONG_BYTE_SIZE // timestamp
+                                      + UUID_BYTE_SIZE;                        // UUID
+    int  MAX_DIGESTS                = (PAYLOAD_BYTE_SIZE - BYTE_SIZE) // 1 byte for #digests
+                                      / DIGEST_BYTE_SIZE;
+
+    int  MAGIC                      = 0xCAFEBABE;
+
+    // Message enums
     byte GOSSIP                     = 1;
     byte REPLY                      = 2;
     byte UPDATE                     = 3;
     byte RING                       = 4;
-    int  INET_ADDRESS_MAX_BYTE_SIZE = 4 // address 
-                                    + 4;   // port 
-    int  DIGEST_BYTE_SIZE           = INET_ADDRESS_MAX_BYTE_SIZE // address
-                                    + 16 // UUID
-                                    + 8;   // timestamp
 
     /**
      * Close the communications connection
      */
     void close();
+
+    /**
+     * @return
+     */
+    SocketAddress getGossipper();
 
     /**
      * The first message of the gossip protocol. Send a list of the shuffled
@@ -77,10 +102,5 @@ public interface GossipMessages {
      *            - the list of replicated states requested.
      */
     void update(List<Update> deltaState);
-
-    /**
-     * @return
-     */
-    SocketAddress getGossipper();
 
 }

@@ -27,12 +27,17 @@
 package com.hellblazer.gossip;
 
 import java.util.UUID;
+import static com.hellblazer.gossip.GossipMessages.*;
+import static com.hellblazer.gossip.HMAC.*;
 
 /**
  * @author hhildebrand
  * 
  */
 public interface GossipListener {
+
+    int MAX_STATE_SIZE = MAX_SEG_SIZE - MAC_BYTE_SIZE - UPDATE_HEADER_BYTE_SIZE;
+
     /**
      * The state is newly discovered
      * 

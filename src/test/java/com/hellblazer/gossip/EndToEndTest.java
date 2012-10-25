@@ -190,7 +190,7 @@ public class EndToEndTest extends TestCase {
                                                                               0.9,
                                                                               100,
                                                                               0.8,
-                                                                              10000,
+                                                                              12000,
                                                                               10,
                                                                               3000);
         Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
