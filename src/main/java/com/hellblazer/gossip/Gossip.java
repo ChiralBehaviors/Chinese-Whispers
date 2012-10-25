@@ -268,7 +268,7 @@ public class Gossip {
     }
 
     public InetSocketAddress getLocalAddress() {
-        return view.getLocalAddress();
+        return communications.getLocalAddress();
     }
 
     /**
@@ -380,7 +380,7 @@ public class Gossip {
                 }
                 deltaState.add(new Update(digest.getAddress(), localState));
             }
-        } else if (view.getLocalAddress().equals(digest.getAddress())) {
+        } else if (getLocalAddress().equals(digest.getAddress())) {
             if (ALL_STATES.equals(digest.getId())) {
                 synchronized (localState) {
                     for (ReplicatedState s : localState.values()) {
@@ -413,7 +413,7 @@ public class Gossip {
         for (Iterator<Entry<InetSocketAddress, Endpoint>> iterator = endpoints.entrySet().iterator(); iterator.hasNext();) {
             Entry<InetSocketAddress, Endpoint> entry = iterator.next();
             InetSocketAddress address = entry.getKey();
-            if (address.equals(view.getLocalAddress())) {
+            if (address.equals(getLocalAddress())) {
                 continue;
             }
 
@@ -516,7 +516,7 @@ public class Gossip {
      */
     protected void discover(final Update update) {
         final InetSocketAddress address = update.node;
-        if (view.getLocalAddress().equals(address)) {
+        if (getLocalAddress().equals(address)) {
             return; // it's our state, dummy
         }
         final Endpoint endpoint = new Endpoint(address, update.state,
@@ -581,7 +581,7 @@ public class Gossip {
                                                 gossipHandler.getGossipper()));
                     }
                 } else {
-                    if (view.getLocalAddress().equals(digest.getAddress())) {
+                    if (getLocalAddress().equals(digest.getAddress())) {
                         addUpdatedState(deltaState, digest);
                     } else {
                         deltaDigests.add(new Digest(digest.getAddress(),
@@ -664,7 +664,8 @@ public class Gossip {
      */
     protected void gossipWithSeeds(final List<Digest> digests,
                                    InetSocketAddress member) {
-        InetSocketAddress address = view.getRandomSeedMember(member);
+        InetSocketAddress address = view.getRandomSeedMember(member,
+                                                             endpoints.size());
         if (address == null) {
             return;
         }
@@ -684,7 +685,7 @@ public class Gossip {
      *            - the digests of interest
      */
     protected void gossipWithTheDead(List<Digest> digests) {
-        InetSocketAddress address = view.getRandomUnreachableMember();
+        InetSocketAddress address = view.getRandomUnreachableMember(endpoints.size());
         if (address == null) {
             return;
         }
@@ -699,7 +700,7 @@ public class Gossip {
      * @return the address of the member contacted
      */
     protected InetSocketAddress gossipWithTheLiving(List<Digest> digests) {
-        InetSocketAddress address = view.getRandomLiveMember();
+        InetSocketAddress address = view.getRandomMember(endpoints.keySet());
         if (address == null) {
             return null;
         }

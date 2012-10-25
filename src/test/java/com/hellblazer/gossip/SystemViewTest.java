@@ -18,8 +18,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Random;
 
 import junit.framework.TestCase;
@@ -54,11 +56,16 @@ public class SystemViewTest extends TestCase {
         SystemView view = new SystemView(random, local, seedHosts,
                                          quarantineDelay, unreachableDelay);
 
+        List<InetSocketAddress> liveSet = new ArrayList<InetSocketAddress>();
+        liveSet.add(live1);
+        liveSet.add(live2);
+        liveSet.add(live3);
+
         view.markAlive(live1);
         view.markAlive(live2);
         view.markAlive(live3);
 
-        assertEquals(live3, view.getRandomLiveMember());
+        assertEquals(live3, view.getRandomMember(liveSet));
     }
 
     public void testQuarantined() throws Exception {
@@ -132,8 +139,8 @@ public class SystemViewTest extends TestCase {
         int unreachableDelay = 400;
         SystemView view = new SystemView(random, local, seedHosts,
                                          quarantineDelay, unreachableDelay);
-        assertNull(view.getRandomSeedMember(seed1));
-        assertEquals(seed3, view.getRandomSeedMember(local));
+        assertNull(view.getRandomSeedMember(seed1, 0));
+        assertEquals(seed1, view.getRandomSeedMember(local, 0));
 
         view.markAlive(live1);
         view.markAlive(live2);
@@ -152,12 +159,12 @@ public class SystemViewTest extends TestCase {
 
         when(random.nextDouble()).thenReturn(0.75, 0.45, 0.0);
 
-        assertNull(view.getRandomSeedMember(local));
-        assertEquals(seed3, view.getRandomSeedMember(local));
+        assertNull(view.getRandomSeedMember(local, 3));
+        assertEquals(seed1, view.getRandomSeedMember(local, 3));
 
         view.markAlive(live4);
         view.markAlive(live5);
-        assertNotNull(view.getRandomSeedMember(local));
+        assertNotNull(view.getRandomSeedMember(local, 3));
     }
 
     public void testUnreachableMembers() throws Exception {
@@ -212,7 +219,7 @@ public class SystemViewTest extends TestCase {
         when(random.nextInt(4)).thenReturn(2, 3);
         when(random.nextDouble()).thenReturn(0.75, 0.40);
 
-        assertNull(view.getRandomUnreachableMember());
-        assertEquals(unreachable3, view.getRandomUnreachableMember());
+        assertNull(view.getRandomUnreachableMember(8));
+        assertEquals(unreachable1, view.getRandomUnreachableMember(8));
     }
 }

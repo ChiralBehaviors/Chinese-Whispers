@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
+import org.mockito.internal.verification.Times;
+
 public class GossipTest extends TestCase {
 
     public void testApplyDiscover() throws Exception {
@@ -40,7 +42,6 @@ public class GossipTest extends TestCase {
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
-        when(view.getLocalAddress()).thenReturn(localAddress);
         when(communications.getLocalAddress()).thenReturn(localAddress);
         GossipListener receiver = mock(GossipListener.class);
 
@@ -80,6 +81,7 @@ public class GossipTest extends TestCase {
                                        isA(Runnable.class));
 
         verify(communications).setGossip(gossip);
+        verify(communications, new Times(5)).getLocalAddress();
 
         verifyNoMoreInteractions(communications);
     }
@@ -91,7 +93,6 @@ public class GossipTest extends TestCase {
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
-        when(view.getLocalAddress()).thenReturn(localAddress);
         when(communications.getLocalAddress()).thenReturn(localAddress);
 
         Endpoint ep1 = mock(Endpoint.class);
@@ -167,6 +168,7 @@ public class GossipTest extends TestCase {
 
         verify(communications).setGossip(gossip);
 
+        verify(communications).getLocalAddress();
         verifyNoMoreInteractions(communications);
     }
 
@@ -178,7 +180,7 @@ public class GossipTest extends TestCase {
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
-        when(view.getLocalAddress()).thenReturn(localAddress);
+        when(communications.getLocalAddress()).thenReturn(localAddress);
 
         Digest digest1 = new Digest(new InetSocketAddress("google.com", 1),
                                     new UUID(0, 1), 3);
@@ -217,7 +219,7 @@ public class GossipTest extends TestCase {
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
-        when(view.getLocalAddress()).thenReturn(localAddress);
+        when(communications.getLocalAddress()).thenReturn(localAddress);
 
         InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
         InetSocketAddress address2 = new InetSocketAddress("127.0.0.1", 2);
