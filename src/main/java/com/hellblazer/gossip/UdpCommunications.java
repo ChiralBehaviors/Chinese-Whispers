@@ -124,6 +124,16 @@ public class UdpCommunications implements GossipCommunications {
     private static final int    DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
     private static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
 
+    public static DatagramSocket connect(InetSocketAddress endpoint)
+                                                                    throws SocketException {
+        try {
+            return new DatagramSocket(endpoint.getPort(), endpoint.getAddress());
+        } catch (SocketException e) {
+            log.error(format("Unable to bind to: %s", endpoint));
+            throw e;
+        }
+    }
+
     public static String prettyPrint(SocketAddress sender,
                                      SocketAddress target, byte[] bytes,
                                      int length) {
@@ -159,32 +169,13 @@ public class UdpCommunications implements GossipCommunications {
     private final AtomicBoolean     running    = new AtomicBoolean();
     private final DatagramSocket    socket;
 
-    public UdpCommunications(InetSocketAddress endpoint,
-                             ExecutorService executor) {
-        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, new HMAC());
-    }
-
-    public UdpCommunications(InetSocketAddress endpoint,
-                             ExecutorService executor, HMAC mac) {
-        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
-    }
-
-    public UdpCommunications(InetSocketAddress endpoint,
-                             ExecutorService executor,
+    public UdpCommunications(DatagramSocket socket, ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier, HMAC mac) {
+                             int sendBufferMultiplier, HMAC mac)
+                                                                throws SocketException {
         hmac = mac;
         dispatcher = executor;
-        try {
-            socket = new DatagramSocket(endpoint.getPort(),
-                                        endpoint.getAddress());
-        } catch (SocketException e) {
-            log.error(format("Unable to bind to: %s", endpoint));
-            throw new IllegalStateException(format("Unable to bind to: %s",
-                                                   endpoint), e);
-        }
+        this.socket = socket;
         localAddress = new InetSocketAddress(socket.getLocalAddress(),
                                              socket.getLocalPort());
         try {
@@ -192,10 +183,31 @@ public class UdpCommunications implements GossipCommunications {
             socket.setSendBufferSize(MAX_SEG_SIZE * sendBufferMultiplier);
         } catch (SocketException e) {
             log.error(format("Unable to configure endpoint: %s", socket));
-            throw new IllegalStateException(
-                                            format("Unable to configure endpoint: %s",
-                                                   socket), e);
+            throw e;
         }
+
+    }
+
+    public UdpCommunications(InetSocketAddress endpoint,
+                             ExecutorService executor) throws SocketException {
+        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
+             DEFAULT_SEND_BUFFER_MULTIPLIER, new HMAC());
+    }
+
+    public UdpCommunications(InetSocketAddress endpoint,
+                             ExecutorService executor, HMAC mac)
+                                                                throws SocketException {
+        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
+             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
+    }
+
+    public UdpCommunications(InetSocketAddress endpoint,
+                             ExecutorService executor,
+                             int receiveBufferMultiplier,
+                             int sendBufferMultiplier, HMAC mac)
+                                                                throws SocketException {
+        this(connect(endpoint), executor, receiveBufferMultiplier,
+             sendBufferMultiplier, mac);
     }
 
     @Override

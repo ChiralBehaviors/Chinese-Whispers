@@ -16,6 +16,7 @@ package com.hellblazer.gossip;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -164,7 +165,7 @@ public class EndToEndTest extends TestCase {
 
     protected Gossip createCommunications(GossipListener receiver,
                                           Collection<InetSocketAddress> seedHosts,
-                                          int i) {
+                                          int i) throws SocketException {
         ThreadFactory threadFactory = new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {

@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 package com.hellblazer.gossip;
+
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
@@ -60,6 +61,10 @@ public class HMAC {
         } catch (Exception e) {
             throw new IllegalStateException();
         }
+    }
+
+    public HMAC(Key key) throws InvalidKeyException {
+        setKey(key);
     }
 
     /**
