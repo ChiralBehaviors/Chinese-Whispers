@@ -195,8 +195,9 @@ public class EndToEndTest extends TestCase {
                                                                               12000,
                                                                               10,
                                                                               3000);
-        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
+        Gossip gossip = new Gossip(communications, view, fdFactory,
                                    new Random(), 1, TimeUnit.SECONDS, 3);
+        gossip.setListener(receiver);
         return gossip;
     }
 

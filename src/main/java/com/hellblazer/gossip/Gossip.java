@@ -39,6 +39,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,7 @@ public class Gossip {
     private final NoArgGenerator                             idGenerator;
     private final int                                        interval;
     private final TimeUnit                                   intervalUnit;
-    private final GossipListener                             listener;
+    private final AtomicReference<GossipListener>            listener   = new AtomicReference<GossipListener>();
     private final Map<UUID, ReplicatedState>                 localState = new HashMap<UUID, ReplicatedState>();
     private final Ring                                       ring;
     private final AtomicBoolean                              running    = new AtomicBoolean();
@@ -95,8 +96,6 @@ public class Gossip {
 
     /**
      * 
-     * @param stateListener
-     *            - the ultimate listener of available gossip
      * @param systemView
      *            - the system management view of the member state
      * @param failureDetectorFactory
@@ -108,20 +107,17 @@ public class Gossip {
      * @param unit
      *            - time unit for the gossip interval
      */
-    public Gossip(GossipListener stateListener,
-                  GossipCommunications communicationsService,
+    public Gossip(GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit) {
-        this(Generators.timeBasedGenerator(), stateListener,
-             communicationsService, systemView, failureDetectorFactory, random,
-             gossipInterval, unit, 3);
+        this(Generators.timeBasedGenerator(), communicationsService,
+             systemView, failureDetectorFactory, random, gossipInterval, unit,
+             3);
     }
 
     /**
      * 
-     * @param stateListener
-     *            - the ultimate listener of available gossip
      * @param systemView
      *            - the system management view of the member state
      * @param failureDetectorFactory
@@ -136,22 +132,19 @@ public class Gossip {
      *            - the number of gossip cycles required to convict a failing
      *            endpoint
      */
-    public Gossip(GossipListener stateListener,
-                  GossipCommunications communicationsService,
+    public Gossip(GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit, int cleanupCycles) {
-        this(Generators.timeBasedGenerator(), stateListener,
-             communicationsService, systemView, failureDetectorFactory, random,
-             gossipInterval, unit, 3);
+        this(Generators.timeBasedGenerator(), communicationsService,
+             systemView, failureDetectorFactory, random, gossipInterval, unit,
+             3);
     }
 
     /**
      * 
      * @param idGenerator
      *            - the UUID generator for state ids on this node
-     * @param stateListener
-     *            - the ultimate listener of available gossip
      * @param systemView
      *            - the system management view of the member state
      * @param failureDetectorFactory
@@ -163,12 +156,12 @@ public class Gossip {
      * @param unit
      *            - time unit for the gossip interval
      */
-    public Gossip(NoArgGenerator idGenerator, GossipListener stateListener,
+    public Gossip(NoArgGenerator idGenerator,
                   GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit) {
-        this(idGenerator, stateListener, communicationsService, systemView,
+        this(idGenerator, communicationsService, systemView,
              failureDetectorFactory, random, gossipInterval, unit, 3);
     }
 
@@ -176,8 +169,6 @@ public class Gossip {
      * 
      * @param idGenerator
      *            - the UUID generator for state ids on this node
-     * @param stateListener
-     *            - the ultimate listener of available gossip
      * @param systemView
      *            - the system management view of the member state
      * @param failureDetectorFactory
@@ -192,7 +183,7 @@ public class Gossip {
      *            - the number of gossip cycles required to convict a failing
      *            endpoint
      */
-    public Gossip(NoArgGenerator idGenerator, GossipListener stateListener,
+    public Gossip(NoArgGenerator idGenerator,
                   GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
@@ -200,7 +191,6 @@ public class Gossip {
         this.idGenerator = idGenerator;
         communications = communicationsService;
         communications.setGossip(this);
-        listener = stateListener;
         entropy = random;
         view = systemView;
         interval = gossipInterval;
@@ -298,6 +288,10 @@ public class Gossip {
         }
         ring.send(new Update(getLocalAddress(), state));
         return id;
+    }
+
+    public void setListener(GossipListener gossipListener) {
+        listener.set(gossipListener);
     }
 
     /**
@@ -735,7 +729,10 @@ public class Gossip {
             @Override
             public void run() {
                 try {
-                    listener.deregister(state.getId());
+                    GossipListener gossipListener = listener.get();
+                    if (gossipListener != null) {
+                        gossipListener.deregister(state.getId());
+                    }
                 } catch (Throwable e) {
                     log.warn(String.format("exception notifying listener of deregistration of state %s",
                                            state.getId()), e);
@@ -757,7 +754,10 @@ public class Gossip {
             @Override
             public void run() {
                 try {
-                    listener.register(state.getId(), state.getState());
+                    GossipListener gossipListener = listener.get();
+                    if (gossipListener != null) {
+                        gossipListener.register(state.getId(), state.getState());
+                    }
                 } catch (Throwable e) {
                     log.warn(String.format("exception notifying listener of registration of state %s",
                                            state.getId()), e);
@@ -776,7 +776,10 @@ public class Gossip {
             @Override
             public void run() {
                 try {
-                    listener.update(state.getId(), state.getState());
+                    GossipListener gossipListener = listener.get();
+                    if (gossipListener != null) {
+                        gossipListener.update(state.getId(), state.getState());
+                    }
                 } catch (Throwable e) {
                     log.warn(String.format("exception notifying listener of update of state %s",
                                            state.getId()), e);

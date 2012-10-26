@@ -63,8 +63,9 @@ public class GossipTest extends TestCase {
                                                                           4),
                                                                  new byte[0]));
 
-        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
-                                   random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
+                                   TimeUnit.DAYS);
+        gossip.setListener(receiver);
 
         gossip.update(state1, address1);
         gossip.update(state2, address1);
@@ -126,14 +127,15 @@ public class GossipTest extends TestCase {
         when(ep1.getState(state3.getId())).thenReturn(state3);
         when(ep1.getState(state4.getId())).thenReturn(state4);
 
-        Gossip gossip = new Gossip(receiver, communications, view, fdFactory,
-                                   random, 4, TimeUnit.DAYS) {
+        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
+                                   TimeUnit.DAYS) {
 
             @Override
             protected void notifyUpdate(ReplicatedState state) {
                 receiver.update(state.getId(), state.getState());
             }
         };
+        gossip.setListener(receiver);
 
         Field ep = Gossip.class.getDeclaredField("endpoints");
         ep.setAccessible(true);
@@ -199,8 +201,9 @@ public class GossipTest extends TestCase {
         Digest digest4a = new Digest(new InetSocketAddress("google.com", 4),
                                      new UUID(0, 4), -1);
 
-        Gossip gossip = new Gossip(listener, communications, view, fdFactory,
-                                   random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
+                                   TimeUnit.DAYS);
+        gossip.setListener(listener);
 
         gossip.examine(new Digest[] { digest1, digest2, digest3, digest4 },
                        gossipHandler);
@@ -250,8 +253,9 @@ public class GossipTest extends TestCase {
                                                      new byte[0]);
         state4.setTime(4);
 
-        Gossip gossip = new Gossip(listener, communications, view, fdFactory,
-                                   random, 4, TimeUnit.DAYS);
+        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
+                                   TimeUnit.DAYS);
+        gossip.setListener(listener);
 
         Field ep = Gossip.class.getDeclaredField("endpoints");
         ep.setAccessible(true);
