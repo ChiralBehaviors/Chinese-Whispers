@@ -183,7 +183,8 @@ public class EndToEndTest extends TestCase {
                                                                  new InetSocketAddress(
                                                                                        "127.0.0.1",
                                                                                        0),
-                                                                 Executors.newCachedThreadPool(threadFactory));
+                                                                 Executors.newFixedThreadPool(2,
+                                                                                              threadFactory));
 
         SystemView view = new SystemView(new Random(),
                                          communications.getLocalAddress(),

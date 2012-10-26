@@ -40,6 +40,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.crypto.ShortBufferException;
@@ -233,7 +234,7 @@ public class UdpCommunications implements GossipCommunications {
     @Override
     public void start() {
         if (running.compareAndSet(false, true)) {
-            dispatcher.execute(serviceTask());
+            Executors.newSingleThreadExecutor().execute(serviceTask());
         }
     }
 
