@@ -51,7 +51,7 @@ import com.fasterxml.uuid.NoArgGenerator;
  * The embodiment of the gossip protocol. This protocol replicates state and
  * forms both a member discovery and failure detection service. Periodically,
  * the protocol chooses a random member from the system view and initiates a
- * round of gossip with it.A round of gossip is push/pull and involves 3
+ * round of gossip with it.  A round of gossip is push/pull and involves 3
  * messages.
  * 
  * For example, if node A wants to initiate a round of gossip with node B it
