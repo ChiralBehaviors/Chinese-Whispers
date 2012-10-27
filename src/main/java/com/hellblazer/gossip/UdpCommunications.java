@@ -456,6 +456,7 @@ public class UdpCommunications implements GossipCommunications {
                         }
                         return;
                     }
+                    buffer.limit(packet.getLength() - MAC_BYTE_SIZE);
                     try {
                         processInbound((InetSocketAddress) packet.getSocketAddress(),
                                        buffer);
