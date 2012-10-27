@@ -112,7 +112,7 @@ public class EndToEndTest extends TestCase {
     public void testEnd2End() throws Exception {
         int membership = 64;
         int maxSeeds = 1;
-        Random entropy = new Random();
+        Random entropy = new Random(0x1638);
         stateIds = new UUID[membership];
 
         Receiver[] receivers = new Receiver[membership];
@@ -186,7 +186,7 @@ public class EndToEndTest extends TestCase {
                                                                  Executors.newFixedThreadPool(2,
                                                                                               threadFactory));
 
-        SystemView view = new SystemView(new Random(),
+        SystemView view = new SystemView(new Random(i),
                                          communications.getLocalAddress(),
                                          seedHosts, 5000, 500000);
         FailureDetectorFactory fdFactory = new AdaptiveFailureDetectorFactory(
@@ -197,7 +197,7 @@ public class EndToEndTest extends TestCase {
                                                                               10,
                                                                               3000);
         Gossip gossip = new Gossip(communications, view, fdFactory,
-                                   new Random(), 1, TimeUnit.SECONDS, 3);
+                                   new Random(i + 1), 1, TimeUnit.SECONDS, 3);
         gossip.setListener(receiver);
         return gossip;
     }

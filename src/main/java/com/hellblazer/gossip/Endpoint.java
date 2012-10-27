@@ -198,6 +198,7 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public void updateState(ReplicatedState newState) {
+        assert newState != null : "updated state cannot be null";
         synchronized (states) {
             states.put(newState.getId(), newState);
         }

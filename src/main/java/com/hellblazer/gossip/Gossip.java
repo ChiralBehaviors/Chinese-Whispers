@@ -51,7 +51,7 @@ import com.fasterxml.uuid.NoArgGenerator;
  * The embodiment of the gossip protocol. This protocol replicates state and
  * forms both a member discovery and failure detection service. Periodically,
  * the protocol chooses a random member from the system view and initiates a
- * round of gossip with it.  A round of gossip is push/pull and involves 3
+ * round of gossip with it. A round of gossip is push/pull and involves 3
  * messages.
  * 
  * For example, if node A wants to initiate a round of gossip with node B it
@@ -68,29 +68,41 @@ import com.fasterxml.uuid.NoArgGenerator;
  * predicts that the endpoint has failed, the endpoint is marked dead and its
  * replicated state is abandoned.
  * 
+ * To ensure liveness, a special heartbeat state is maintained. This special
+ * state is not part of the notification regime and is updated periodically by
+ * this host.
+ * 
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
  */
 public class Gossip {
-    private static final UUID                                ALL_STATES = new UUID(
-                                                                                   0L,
-                                                                                   0L);
+    public static final UUID                                 ALL_STATES              = new UUID(
+                                                                                                0L,
+                                                                                                0L);
+    public static final UUID                                 HEARTBEAT               = new UUID(
+                                                                                                0L,
+                                                                                                0L);
+    private static final int                                 DEFAULT_CLEANUP_CYCLES  = 3;
+    private static final int                                 DEFAULT_HEARTBEAT_CYCLE = 1;
+    private final static Logger                              log                     = LoggerFactory.getLogger(Gossip.class);
 
-    private final static Logger                              log        = LoggerFactory.getLogger(Gossip.class);
+    private static final byte[]                              NO_STATE                = new byte[0];
     private final int                                        cleanupCycles;
     private final GossipCommunications                       communications;
     private final Executor                                   dispatcher;
-    private final ConcurrentMap<InetSocketAddress, Endpoint> endpoints  = new ConcurrentHashMap<InetSocketAddress, Endpoint>();
+    private final ConcurrentMap<InetSocketAddress, Endpoint> endpoints               = new ConcurrentHashMap<InetSocketAddress, Endpoint>();
     private final Random                                     entropy;
     private final FailureDetectorFactory                     fdFactory;
     private ScheduledFuture<?>                               gossipTask;
+    private final int                                        heartbeatCycle;
+    private int                                              heartbeatCounter        = 0;
     private final NoArgGenerator                             idGenerator;
     private final int                                        interval;
     private final TimeUnit                                   intervalUnit;
-    private final AtomicReference<GossipListener>            listener   = new AtomicReference<GossipListener>();
-    private final Map<UUID, ReplicatedState>                 localState = new HashMap<UUID, ReplicatedState>();
+    private final AtomicReference<GossipListener>            listener                = new AtomicReference<GossipListener>();
+    private final Map<UUID, ReplicatedState>                 localState              = new HashMap<UUID, ReplicatedState>();
     private final Ring                                       ring;
-    private final AtomicBoolean                              running    = new AtomicBoolean();
+    private final AtomicBoolean                              running                 = new AtomicBoolean();
     private final ScheduledExecutorService                   scheduler;
     private final SystemView                                 view;
 
@@ -113,7 +125,7 @@ public class Gossip {
                   int gossipInterval, TimeUnit unit) {
         this(Generators.timeBasedGenerator(), communicationsService,
              systemView, failureDetectorFactory, random, gossipInterval, unit,
-             3);
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
     }
 
     /**
@@ -138,7 +150,7 @@ public class Gossip {
                   int gossipInterval, TimeUnit unit, int cleanupCycles) {
         this(Generators.timeBasedGenerator(), communicationsService,
              systemView, failureDetectorFactory, random, gossipInterval, unit,
-             3);
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
     }
 
     /**
@@ -162,7 +174,8 @@ public class Gossip {
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit) {
         this(idGenerator, communicationsService, systemView,
-             failureDetectorFactory, random, gossipInterval, unit, 3);
+             failureDetectorFactory, random, gossipInterval, unit,
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
     }
 
     /**
@@ -182,12 +195,15 @@ public class Gossip {
      * @param cleanupCycles
      *            - the number of gossip cycles required to convict a failing
      *            endpoint
+     * @param heartbeatCycle
+     *            = the number of gossip cycles per heartbeat
      */
     public Gossip(NoArgGenerator idGenerator,
                   GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
-                  int gossipInterval, TimeUnit unit, int cleanupCycles) {
+                  int gossipInterval, TimeUnit unit, int cleanupCycles,
+                  int heartbeatCycle) {
         this.idGenerator = idGenerator;
         communications = communicationsService;
         communications.setGossip(this);
@@ -198,6 +214,7 @@ public class Gossip {
         fdFactory = failureDetectorFactory;
         ring = new Ring(getLocalAddress(), communications);
         this.cleanupCycles = cleanupCycles;
+        this.heartbeatCycle = heartbeatCycle;
         scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -359,6 +376,19 @@ public class Gossip {
             for (ReplicatedState state : localState.values()) {
                 deltaState.add(new Update(getLocalAddress(), state));
             }
+        }
+    }
+
+    private void updateHeartbeat() {
+        if ((heartbeatCounter++ % heartbeatCycle) != 0) {
+            return;
+        }
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("%s updating heartbeat state",
+                                    getLocalAddress()));
+        }
+        synchronized (localState) {
+            localState.put(HEARTBEAT, new ReplicatedState(HEARTBEAT, NO_STATE));
         }
     }
 
@@ -606,6 +636,7 @@ public class Gossip {
      *            - the mechanism to send the gossip message to a peer
      */
     protected void gossip() {
+        updateHeartbeat();
         List<Digest> digests = randomDigests();
         InetSocketAddress member = gossipWithTheLiving(digests);
         gossipWithTheDead(digests);
@@ -719,6 +750,9 @@ public class Gossip {
      */
     protected void notifyDeregister(final ReplicatedState state) {
         assert state != null;
+        if (HEARTBEAT.equals(state.getId())) {
+            return;
+        }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying deregistration of: %s",
                                     getLocalAddress(), state));
@@ -744,6 +778,9 @@ public class Gossip {
      */
     protected void notifyRegister(final ReplicatedState state) {
         assert state != null;
+        if (HEARTBEAT.equals(state.getId())) {
+            return;
+        }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying registration of: %s",
                                     getLocalAddress(), state));
@@ -766,6 +803,9 @@ public class Gossip {
 
     protected void notifyUpdate(final ReplicatedState state) {
         assert state != null;
+        if (HEARTBEAT.equals(state.getId())) {
+            return;
+        }
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying update of: %s",
                                     getLocalAddress(), state));
@@ -854,6 +894,8 @@ public class Gossip {
      * The third message of the gossip protocol. This is the final message in
      * the gossip protocol. The supplied state is the updated state requested by
      * the receiver in response to the digests in the original gossip message.
+     * 
+     * TODO More elegant handling of the HEARTBEAT state
      * 
      * @param update
      *            - the updated state requested from our partner
