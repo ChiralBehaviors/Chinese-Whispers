@@ -607,11 +607,9 @@ public class Gossip {
      */
     protected void gossip() {
         List<Digest> digests = randomDigests();
-        if (digests.size() > 0) {
-            InetSocketAddress member = gossipWithTheLiving(digests);
-            gossipWithTheDead(digests);
-            gossipWithSeeds(digests, member);
-        }
+        InetSocketAddress member = gossipWithTheLiving(digests);
+        gossipWithTheDead(digests);
+        gossipWithSeeds(digests, member);
         checkStatus();
     }
 
