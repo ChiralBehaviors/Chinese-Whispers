@@ -105,6 +105,10 @@ public class ReplicatedState {
         return result;
     }
 
+    public boolean isEmpty() {
+        return state.length == 0;
+    }
+
     /**
      * @param time
      *            the time to set

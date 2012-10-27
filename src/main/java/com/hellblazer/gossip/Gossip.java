@@ -86,7 +86,7 @@ public class Gossip {
     private static final int                                 DEFAULT_HEARTBEAT_CYCLE = 1;
     private final static Logger                              log                     = LoggerFactory.getLogger(Gossip.class);
 
-    private static final byte[]                              NO_STATE                = new byte[0];
+    private static final byte[]                              EMPTY_STATE             = new byte[0];
     private final int                                        cleanupCycles;
     private final GossipCommunications                       communications;
     private final Executor                                   dispatcher;
@@ -262,7 +262,7 @@ public class Gossip {
             throw new NullPointerException(
                                            "replicated state id must not be null");
         }
-        ReplicatedState state = new ReplicatedState(id, new byte[0]);
+        ReplicatedState state = new ReplicatedState(id, EMPTY_STATE);
         state.setTime(System.currentTimeMillis());
         synchronized (localState) {
             localState.put(id, state);
@@ -388,7 +388,8 @@ public class Gossip {
                                     getLocalAddress()));
         }
         synchronized (localState) {
-            localState.put(HEARTBEAT, new ReplicatedState(HEARTBEAT, NO_STATE));
+            localState.put(HEARTBEAT, new ReplicatedState(HEARTBEAT,
+                                                          EMPTY_STATE));
         }
     }
 
@@ -922,19 +923,24 @@ public class Gossip {
         }
         Endpoint endpoint = endpoints.get(update.node);
         if (endpoint != null) {
-            ReplicatedState state = endpoint.getState(update.state.getId());
-            if (state == null) {
+            ReplicatedState previousState = endpoint.getState(update.state.getId());
+            if (previousState == null) {
                 endpoint.updateState(update.state);
                 notifyRegister(update.state);
             } else {
                 // TODO this logic is quite slow and unnecessary
-                if (update.state.getTime() > state.getTime()) {
-                    long oldTime = state.getTime();
+                if (update.state.getTime() > previousState.getTime()) {
+                    long oldTime = previousState.getTime();
                     endpoint.updateState(update.state);
-                    notifyUpdate(state);
+                    if (update.state.isEmpty()) {
+                        notifyDeregister(update.state);
+                    } else {
+                        notifyUpdate(update.state);
+                    }
                     if (log.isTraceEnabled()) {
                         log.trace(format("Updating state time stamp to %s from %s for %s",
-                                         state.getTime(), oldTime, update.node));
+                                         update.state.getTime(), oldTime,
+                                         update.node));
                     }
                     return true;
                 }
