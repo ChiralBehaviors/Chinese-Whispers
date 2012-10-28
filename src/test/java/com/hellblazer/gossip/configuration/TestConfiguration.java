@@ -33,7 +33,7 @@ public class TestConfiguration {
     @Test
     public void configurationTest() throws Exception {
         InputStream is = getClass().getResourceAsStream("minimalConfig.yml");
-        Configuration config = Configuration.fromYaml(is);
+        GossipConfiguration config = GossipConfiguration.fromYaml(is);
         assertNotNull(config);
         Gossip gossip = config.construct();
         assertNotNull(gossip);

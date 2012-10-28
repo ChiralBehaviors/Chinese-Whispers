@@ -65,7 +65,7 @@ import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
  * @author hhildebrand
  * 
  */
-public class Configuration {
+public class GossipConfiguration {
 
     public static class Address {
         public InetAddress host;
@@ -84,14 +84,14 @@ public class Configuration {
         }
     }
 
-    private static Logger log = LoggerFactory.getLogger(Configuration.class);
+    private static Logger log = LoggerFactory.getLogger(GossipConfiguration.class);
 
-    public static Configuration fromYaml(InputStream yaml)
-                                                          throws JsonParseException,
-                                                          JsonMappingException,
-                                                          IOException {
+    public static GossipConfiguration fromYaml(InputStream yaml)
+                                                                throws JsonParseException,
+                                                                JsonMappingException,
+                                                                IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        return mapper.readValue(yaml, Configuration.class);
+        return mapper.readValue(yaml, GossipConfiguration.class);
     }
 
     public int                    cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
