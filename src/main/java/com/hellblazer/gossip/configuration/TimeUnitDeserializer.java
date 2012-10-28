@@ -16,26 +16,24 @@
 
 package com.hellblazer.gossip.configuration;
 
-import static junit.framework.Assert.assertNotNull;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-import java.io.InputStream;
-
-import org.junit.Test;
-
-import com.hellblazer.gossip.Gossip;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 
 /**
  * @author hhildebrand
  * 
  */
-public class TestConfiguration {
+public class TimeUnitDeserializer extends FromStringDeserializer<TimeUnit> {
+    public TimeUnitDeserializer() {
+        super(TimeUnit.class);
+    }
 
-    @Test
-    public void configurationTest() throws Exception {
-        InputStream is = getClass().getResourceAsStream("minimalConfig.yml");
-        Configuration config = Configuration.fromYaml(is);
-        assertNotNull(config);
-        Gossip gossip = config.construct();
-        assertNotNull(gossip);
+    @Override
+    protected TimeUnit _deserialize(String value, DeserializationContext ctxt)
+                                                                              throws IOException {
+        return TimeUnit.valueOf(value.toUpperCase());
     }
 }

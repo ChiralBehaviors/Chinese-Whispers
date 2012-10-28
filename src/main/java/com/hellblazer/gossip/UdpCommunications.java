@@ -128,18 +128,18 @@ public class UdpCommunications implements GossipCommunications {
 
     }
 
-    public static final int     DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
-    public static final int     DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
+    public static final int    DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
+    public static final int    DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
 
     // Default MAC key used strictly for message integrity
-    private static byte[]       DEFAULT_KEY_DATA                  = {
+    private static byte[]      DEFAULT_KEY_DATA                  = {
             (byte) 0x23, (byte) 0x45, (byte) 0x83, (byte) 0xad, (byte) 0x23,
             (byte) 0x46, (byte) 0x83, (byte) 0xad, (byte) 0x23, (byte) 0x45,
             (byte) 0x83, (byte) 0xad, (byte) 0x23, (byte) 0x45, (byte) 0x83,
-            (byte) 0xad                                          };
+            (byte) 0xad                                         };
     // Default MAC used strictly for message integrity
-    private static String       DEFAULT_MAC_TYPE                  = "HmacMD5";
-    private static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
+    private static String      DEFAULT_MAC_TYPE                  = "HmacMD5";
+    public static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
 
     public static DatagramSocket connect(InetSocketAddress endpoint)
                                                                     throws SocketException {
@@ -149,6 +149,28 @@ public class UdpCommunications implements GossipCommunications {
             log.error(format("Unable to bind to: %s", endpoint));
             throw e;
         }
+    }
+
+    /**
+     * @return a default mac, with a fixed key. Used for validation only, no
+     *         authentication
+     */
+    public static Mac defaultMac() {
+        Mac mac;
+        try {
+            mac = Mac.getInstance(DEFAULT_MAC_TYPE);
+            mac.init(new SecretKeySpec(DEFAULT_KEY_DATA, DEFAULT_MAC_TYPE));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(
+                                            String.format("Unable to create default mac %s",
+                                                          DEFAULT_MAC_TYPE));
+        } catch (InvalidKeyException e) {
+            throw new IllegalStateException(
+                                            String.format("Invalid default key %s for default mac %s",
+                                                          Arrays.toString(DEFAULT_KEY_DATA),
+                                                          DEFAULT_MAC_TYPE));
+        }
+        return mac;
     }
 
     public static String prettyPrint(SocketAddress sender,
@@ -174,28 +196,6 @@ public class UdpCommunications implements GossipCommunications {
         HexDump.hexdump(stream, data, offset, length);
         stream.close();
         return baos.toString();
-    }
-
-    /**
-     * @return a default mac, with a fixed key. Used for validation only, no
-     *         authentication
-     */
-    protected static Mac defaultMac() {
-        Mac mac;
-        try {
-            mac = Mac.getInstance(DEFAULT_MAC_TYPE);
-            mac.init(new SecretKeySpec(DEFAULT_KEY_DATA, DEFAULT_MAC_TYPE));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(
-                                            String.format("Unable to create default mac %s",
-                                                          DEFAULT_MAC_TYPE));
-        } catch (InvalidKeyException e) {
-            throw new IllegalStateException(
-                                            String.format("Invalid default key %s for default mac %s",
-                                                          Arrays.toString(DEFAULT_KEY_DATA),
-                                                          DEFAULT_MAC_TYPE));
-        }
-        return mac;
     }
 
     private final ByteBufferPool    bufferPool = new ByteBufferPool(

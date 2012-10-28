@@ -81,11 +81,11 @@ public class Gossip {
     public static final UUID                                 HEARTBEAT               = new UUID(
                                                                                                 0L,
                                                                                                 0L);
-    private static final int                                 DEFAULT_CLEANUP_CYCLES  = 3;
-    private static final int                                 DEFAULT_HEARTBEAT_CYCLE = 1;
-    private final static Logger                              log                     = LoggerFactory.getLogger(Gossip.class);
-
+    public static final int                                  DEFAULT_CLEANUP_CYCLES  = 3;
+    public static final int                                  DEFAULT_HEARTBEAT_CYCLE = 1;
+    public final static Logger                               log                     = LoggerFactory.getLogger(Gossip.class);
     private static final byte[]                              EMPTY_STATE             = new byte[0];
+
     private final int                                        cleanupCycles;
     private final GossipCommunications                       communications;
     private final Executor                                   dispatcher;

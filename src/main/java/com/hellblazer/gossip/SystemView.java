@@ -52,10 +52,10 @@ public class SystemView {
     private final Random                       entropy;
     private final InetSocketAddress            localAddress;
     private final Map<InetSocketAddress, Long> quarantined = new HashMap<InetSocketAddress, Long>();
-    private final int                          quarantineInterval;
+    private final long                         quarantineInterval;
     private final Set<InetSocketAddress>       seeds       = new OaHashSet<InetSocketAddress>();
     private final Map<InetSocketAddress, Long> unreachable = new HashMap<InetSocketAddress, Long>();
-    private final int                          unreachableInterval;
+    private final long                         unreachableInterval;
 
     /**
      * 
@@ -75,7 +75,7 @@ public class SystemView {
      */
     public SystemView(Random random, InetSocketAddress localAddress,
                       Collection<InetSocketAddress> seedHosts,
-                      int quarantineDelay, int unreachableDelay) {
+                      long quarantineDelay, long unreachableDelay) {
         assert validAddresses(seedHosts);
         entropy = random;
         this.localAddress = localAddress;
