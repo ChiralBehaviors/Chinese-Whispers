@@ -262,8 +262,9 @@ public class Gossip {
             throw new NullPointerException(
                                            "replicated state id must not be null");
         }
-        ReplicatedState state = new ReplicatedState(id, EMPTY_STATE);
-        state.setTime(System.currentTimeMillis());
+        ReplicatedState state = new ReplicatedState(id,
+                                                    System.currentTimeMillis(),
+                                                    EMPTY_STATE);
         synchronized (localState) {
             localState.put(id, state);
         }
@@ -295,7 +296,9 @@ public class Gossip {
                                                              MAX_STATE_SIZE));
         }
         UUID id = idGenerator.generate();
-        ReplicatedState state = new ReplicatedState(id, replicatedState);
+        ReplicatedState state = new ReplicatedState(id,
+                                                    System.currentTimeMillis(),
+                                                    replicatedState);
         synchronized (localState) {
             localState.put(id, state);
         }
@@ -355,8 +358,9 @@ public class Gossip {
                                                              replicatedState.length,
                                                              MAX_STATE_SIZE));
         }
-        ReplicatedState state = new ReplicatedState(id, replicatedState);
-        state.setTime(System.currentTimeMillis());
+        ReplicatedState state = new ReplicatedState(id,
+                                                    System.currentTimeMillis(),
+                                                    replicatedState);
         synchronized (localState) {
             localState.put(id, state);
         }
@@ -388,8 +392,10 @@ public class Gossip {
                                     getLocalAddress()));
         }
         synchronized (localState) {
-            localState.put(HEARTBEAT, new ReplicatedState(HEARTBEAT,
-                                                          EMPTY_STATE));
+            localState.put(HEARTBEAT,
+                           new ReplicatedState(HEARTBEAT,
+                                               System.currentTimeMillis(),
+                                               EMPTY_STATE));
         }
     }
 
@@ -551,7 +557,9 @@ public class Gossip {
             public void run() {
                 Endpoint previous = endpoints.putIfAbsent(address, endpoint);
                 if (previous != null) {
-                    endpoint.getHandler().close();
+                    if (endpoint.getHandler() != null) {
+                        endpoint.getHandler().close();
+                    }
                     if (log.isDebugEnabled()) {
                         log.debug(format("Endpoint already established for %s",
                                          endpoint.getAddress()));

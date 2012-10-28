@@ -23,9 +23,9 @@ import java.util.UUID;
  * 
  */
 public class ReplicatedState {
-    private final UUID    id;
-    private final byte[]  state;
-    private volatile long time = -1L;
+    private final UUID   id;
+    private final byte[] state;
+    private final long   time;
 
     /**
      * @param buffer
@@ -42,10 +42,10 @@ public class ReplicatedState {
      * @param id
      * @param state
      */
-    public ReplicatedState(UUID id, byte[] state) {
+    public ReplicatedState(UUID id, long time, byte[] state) {
         this.id = id;
+        this.time = time;
         this.state = state;
-        time = System.currentTimeMillis();
     }
 
     /* (non-Javadoc)
@@ -107,14 +107,6 @@ public class ReplicatedState {
 
     public boolean isEmpty() {
         return state.length == 0;
-    }
-
-    /**
-     * @param time
-     *            the time to set
-     */
-    public void setTime(long time) {
-        this.time = time;
     }
 
     /* (non-Javadoc)
