@@ -384,7 +384,7 @@ public class Gossip {
     }
 
     private void updateHeartbeat() {
-        if ((heartbeatCounter++ % heartbeatCycle) != 0) {
+        if (heartbeatCounter++ % heartbeatCycle != 0) {
             return;
         }
         if (log.isTraceEnabled()) {

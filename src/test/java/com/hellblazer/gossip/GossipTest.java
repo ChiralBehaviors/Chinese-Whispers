@@ -37,6 +37,90 @@ import org.mockito.internal.verification.Times;
 
 public class GossipTest extends TestCase {
 
+    public void testApplyDeregister() throws Exception {
+        GossipCommunications communications = mock(GossipCommunications.class);
+        FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
+        SystemView view = mock(SystemView.class);
+        Random random = mock(Random.class);
+        InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
+        when(communications.getLocalAddress()).thenReturn(localAddress);
+        GossipListener receiver = mock(GossipListener.class);
+
+        InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
+        InetSocketAddress address2 = new InetSocketAddress("127.0.0.1", 2);
+        InetSocketAddress address3 = new InetSocketAddress("127.0.0.1", 3);
+        InetSocketAddress address4 = new InetSocketAddress("127.0.0.1", 4);
+
+        Update state1 = new Update(address1,
+                                   new ReplicatedState(new UUID(666, 1), 1,
+                                                       new byte[0]));
+        Update state2 = new Update(address2,
+                                   new ReplicatedState(new UUID(666, 2), 1,
+                                                       new byte[0]));
+        Update state3 = new Update(address3,
+                                   new ReplicatedState(new UUID(666, 3), 1,
+                                                       new byte[0]));
+        Update state4 = new Update(address4,
+                                   new ReplicatedState(new UUID(666, 4), 1,
+                                                       new byte[0]));
+
+        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
+                                   TimeUnit.DAYS);
+        gossip.setListener(receiver);
+
+        gossip.update(state1, address1);
+        gossip.update(state2, address1);
+        gossip.update(state3, address1);
+        gossip.update(state4, address1);
+
+        ArgumentCaptor<Runnable> connectActions = ArgumentCaptor.forClass(Runnable.class);
+
+        verify(communications).connect(eq(address1), isA(Endpoint.class),
+                                       connectActions.capture());
+        verify(communications).connect(eq(address2), isA(Endpoint.class),
+                                       connectActions.capture());
+        verify(communications).connect(eq(address3), isA(Endpoint.class),
+                                       connectActions.capture());
+        verify(communications).connect(eq(address4), isA(Endpoint.class),
+                                       connectActions.capture());
+        for (Runnable runnable : connectActions.getAllValues()) {
+            runnable.run();
+        }
+
+        // Once more with *feeling*
+
+        state1 = new Update(address1, new ReplicatedState(new UUID(666, 1), 2,
+                                                          new byte[0]));
+        state2 = new Update(address2, new ReplicatedState(new UUID(666, 2), 3,
+                                                          new byte[0]));
+        state3 = new Update(address3, new ReplicatedState(new UUID(666, 3), 4,
+                                                          new byte[0]));
+        state4 = new Update(address4, new ReplicatedState(new UUID(666, 4), 5,
+                                                          new byte[0]));
+
+        gossip.update(state1, address1);
+        gossip.update(state2, address1);
+        gossip.update(state3, address1);
+        gossip.update(state4, address1);
+
+        verify(communications).setGossip(gossip);
+        verify(communications, new Times(5)).getLocalAddress();
+
+        verifyNoMoreInteractions(communications);
+
+        verify(receiver).register(eq(state1.state.getId()), isA(byte[].class));
+        verify(receiver).register(eq(state2.state.getId()), isA(byte[].class));
+        verify(receiver).register(eq(state3.state.getId()), isA(byte[].class));
+        verify(receiver).register(eq(state4.state.getId()), isA(byte[].class));
+
+        verify(receiver).deregister(eq(state1.state.getId()));
+        verify(receiver).deregister(eq(state2.state.getId()));
+        verify(receiver).deregister(eq(state3.state.getId()));
+        verify(receiver).deregister(eq(state4.state.getId()));
+
+        verifyNoMoreInteractions(receiver);
+    }
+
     public void testApplyDiscover() throws Exception {
         GossipCommunications communications = mock(GossipCommunications.class);
         FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
@@ -217,90 +301,6 @@ public class GossipTest extends TestCase {
         verify(gossipHandler).reply(asList(digest1a, digest2a, digest3a,
                                            digest4a), new ArrayList<Update>());
         verifyNoMoreInteractions(gossipHandler);
-    }
-
-    public void testApplyDeregister() throws Exception {
-        GossipCommunications communications = mock(GossipCommunications.class);
-        FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
-        SystemView view = mock(SystemView.class);
-        Random random = mock(Random.class);
-        InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
-        when(communications.getLocalAddress()).thenReturn(localAddress);
-        GossipListener receiver = mock(GossipListener.class);
-
-        InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
-        InetSocketAddress address2 = new InetSocketAddress("127.0.0.1", 2);
-        InetSocketAddress address3 = new InetSocketAddress("127.0.0.1", 3);
-        InetSocketAddress address4 = new InetSocketAddress("127.0.0.1", 4);
-
-        Update state1 = new Update(address1,
-                                   new ReplicatedState(new UUID(666, 1), 1,
-                                                       new byte[0]));
-        Update state2 = new Update(address2,
-                                   new ReplicatedState(new UUID(666, 2), 1,
-                                                       new byte[0]));
-        Update state3 = new Update(address3,
-                                   new ReplicatedState(new UUID(666, 3), 1,
-                                                       new byte[0]));
-        Update state4 = new Update(address4,
-                                   new ReplicatedState(new UUID(666, 4), 1,
-                                                       new byte[0]));
-
-        Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
-                                   TimeUnit.DAYS);
-        gossip.setListener(receiver);
-
-        gossip.update(state1, address1);
-        gossip.update(state2, address1);
-        gossip.update(state3, address1);
-        gossip.update(state4, address1);
-
-        ArgumentCaptor<Runnable> connectActions = ArgumentCaptor.forClass(Runnable.class);
-
-        verify(communications).connect(eq(address1), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address2), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address3), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address4), isA(Endpoint.class),
-                                       connectActions.capture());
-        for (Runnable runnable : connectActions.getAllValues()) {
-            runnable.run();
-        }
-
-        // Once more with *feeling*
-
-        state1 = new Update(address1, new ReplicatedState(new UUID(666, 1), 2,
-                                                          new byte[0]));
-        state2 = new Update(address2, new ReplicatedState(new UUID(666, 2), 3,
-                                                          new byte[0]));
-        state3 = new Update(address3, new ReplicatedState(new UUID(666, 3), 4,
-                                                          new byte[0]));
-        state4 = new Update(address4, new ReplicatedState(new UUID(666, 4), 5,
-                                                          new byte[0]));
-
-        gossip.update(state1, address1);
-        gossip.update(state2, address1);
-        gossip.update(state3, address1);
-        gossip.update(state4, address1);
-
-        verify(communications).setGossip(gossip);
-        verify(communications, new Times(5)).getLocalAddress();
-
-        verifyNoMoreInteractions(communications);
-
-        verify(receiver).register(eq(state1.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state2.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state3.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state4.state.getId()), isA(byte[].class));
-
-        verify(receiver).deregister(eq(state1.state.getId()));
-        verify(receiver).deregister(eq(state2.state.getId()));
-        verify(receiver).deregister(eq(state3.state.getId()));
-        verify(receiver).deregister(eq(state4.state.getId()));
-
-        verifyNoMoreInteractions(receiver);
     }
 
     public void testExamineMixed() throws Exception {
