@@ -30,7 +30,6 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -47,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
@@ -58,6 +56,7 @@ import com.hellblazer.gossip.Gossip;
 import com.hellblazer.gossip.SystemView;
 import com.hellblazer.gossip.UdpCommunications;
 import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
+import com.hellblazer.utils.Base64Coder;
 
 /**
  * A configuration bean for constructing Gossip instances
@@ -99,12 +98,10 @@ public class GossipConfiguration {
     public Address                endpoint                = new Address(0);
     public FailureDetectorFactory fdFactory;
     public int                    gossipInterval          = 3;
-    @JsonDeserialize(as = TimeUnit.class, using = TimeUnitDeserializer.class)
-    public TimeUnit               gossipUnit              = TimeUnit.SECONDS;
+    public String                 gossipUnit              = TimeUnit.SECONDS.name();
     public int                    heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
     public String                 hmac;
-    @JsonDeserialize(as = byte[].class, using = Base64Deserializer.class)
-    public byte[]                 hmacKey;
+    public String                 hmacKey;
     public String                 networkInterface;
     public long                   quarantineDelay         = TimeUnit.SECONDS.toMillis(6);
     public int                    receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
@@ -119,8 +116,8 @@ public class GossipConfiguration {
                                          getSeeds(), quarantineDelay,
                                          unreachableDelay);
         return new Gossip(getUuidGenerator(), comms, view, getFdFactory(),
-                          entropy, gossipInterval, gossipUnit, cleanupCycles,
-                          heartbeatCycle);
+                          entropy, gossipInterval, getGossipUnit(),
+                          cleanupCycles, heartbeatCycle);
     }
 
     public UdpCommunications constructUdpComms() throws SocketException {
@@ -154,7 +151,7 @@ public class GossipConfiguration {
 
     public FailureDetectorFactory getFdFactory() {
         if (fdFactory == null) {
-            long gossipIntervalMillis = gossipUnit.toMillis(gossipInterval);
+            long gossipIntervalMillis = getGossipUnit().toMillis(gossipInterval);
             fdFactory = new AdaptiveFailureDetectorFactory(
                                                            0.9,
                                                            50,
@@ -174,7 +171,7 @@ public class GossipConfiguration {
         Mac mac;
         try {
             mac = Mac.getInstance(hmac);
-            mac.init(new SecretKeySpec(hmacKey, hmac));
+            mac.init(new SecretKeySpec(Base64Coder.decode(hmacKey), hmac));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(
                                             String.format("Unable to create mac %s",
@@ -182,8 +179,7 @@ public class GossipConfiguration {
         } catch (InvalidKeyException e) {
             throw new IllegalStateException(
                                             String.format("Invalid key %s for mac %s",
-                                                          Arrays.toString(hmacKey),
-                                                          hmac));
+                                                          hmacKey, hmac));
         }
         return mac;
     }
@@ -209,5 +205,15 @@ public class GossipConfiguration {
             }
         }
         return Generators.timeBasedGenerator();
+    }
+
+    public TimeUnit getGossipUnit() {
+        try {
+            return TimeUnit.valueOf(gossipUnit);
+        } catch (IllegalArgumentException e) {
+            log.error(String.format("%s is not a legal TimeUnit value"),
+                      gossipUnit);
+            throw e;
+        }
     }
 }
