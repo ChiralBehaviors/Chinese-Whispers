@@ -14,8 +14,6 @@
  */
 package com.hellblazer.gossip;
 
-import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
-
 import java.net.SocketAddress;
 import java.util.List;
 
@@ -39,8 +37,6 @@ public interface GossipMessages {
     int  UUID_BYTE_SIZE             = LONG_BYTE_SIZE + LONG_BYTE_SIZE;
     int  MESSAGE_TYPE_BYTE_SIZE     = BYTE_SIZE;
     int  MESSAGE_HEADER_BYTE_SIZE   = MAGIC_BYTE_SIZE + MESSAGE_TYPE_BYTE_SIZE;
-    int  PAYLOAD_BYTE_SIZE          = MAX_SEG_SIZE - MESSAGE_HEADER_BYTE_SIZE
-                                      - MAC_BYTE_SIZE;
     int  INET_ADDRESS_MAX_BYTE_SIZE = INT_BYTE_SIZE // address 
                                       + INT_BYTE_SIZE;                         // port 
     int  DATA_POSITION              = MESSAGE_HEADER_BYTE_SIZE;
@@ -50,9 +46,7 @@ public interface GossipMessages {
     int  UPDATE_HEADER_BYTE_SIZE    = MESSAGE_HEADER_BYTE_SIZE
                                       + INET_ADDRESS_MAX_BYTE_SIZE // endpoint address
                                       + LONG_BYTE_SIZE // timestamp
-                                      + UUID_BYTE_SIZE;                        // UUID
-    int  MAX_DIGESTS                = (PAYLOAD_BYTE_SIZE - BYTE_SIZE) // 1 byte for #digests
-                                      / DIGEST_BYTE_SIZE;
+                                      + UUID_BYTE_SIZE;    
 
     int  MAGIC                      = 0xCAFEBABE;
 

@@ -15,10 +15,6 @@
  */
 package com.hellblazer.gossip;
 
-import static com.hellblazer.gossip.GossipMessages.MAX_SEG_SIZE;
-import static com.hellblazer.gossip.GossipMessages.UPDATE_HEADER_BYTE_SIZE;
-import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
-
 import java.util.UUID;
 
 /**
@@ -26,8 +22,6 @@ import java.util.UUID;
  * 
  */
 public interface GossipListener {
-
-    int MAX_STATE_SIZE = MAX_SEG_SIZE - MAC_BYTE_SIZE - UPDATE_HEADER_BYTE_SIZE;
 
     /**
      * Previously known state has been abandoned

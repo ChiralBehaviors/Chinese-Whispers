@@ -76,4 +76,9 @@ public interface GossipCommunications {
      * @param inetSocketAddress
      */
     void update(Update state, InetSocketAddress inetSocketAddress);
+
+    /**
+     * @return the maximum byte size for replicated state
+     */
+    int getMaxStateSize();
 }

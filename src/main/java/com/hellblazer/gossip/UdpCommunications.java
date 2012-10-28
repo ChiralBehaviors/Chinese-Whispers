@@ -14,15 +14,18 @@
  */
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.GossipMessages.BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.DATA_POSITION;
+import static com.hellblazer.gossip.GossipMessages.DIGEST_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.GOSSIP;
 import static com.hellblazer.gossip.GossipMessages.MAGIC;
 import static com.hellblazer.gossip.GossipMessages.MAGIC_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.MAX_SEG_SIZE;
+import static com.hellblazer.gossip.GossipMessages.MESSAGE_HEADER_BYTE_SIZE;
 import static com.hellblazer.gossip.GossipMessages.REPLY;
 import static com.hellblazer.gossip.GossipMessages.RING;
 import static com.hellblazer.gossip.GossipMessages.UPDATE;
-import static com.hellblazer.gossip.HMAC.MAC_BYTE_SIZE;
+import static com.hellblazer.gossip.GossipMessages.UPDATE_HEADER_BYTE_SIZE;
 import static java.lang.Math.min;
 import static java.lang.String.format;
 
@@ -36,14 +39,19 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.crypto.Mac;
 import javax.crypto.ShortBufferException;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +66,6 @@ import com.hellblazer.utils.HexDump;
  * 
  */
 public class UdpCommunications implements GossipCommunications {
-
     private class GossipHandler implements GossipMessages {
         private final InetSocketAddress gossipper;
 
@@ -103,7 +110,7 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             for (int i = 0; i < digests.size();) {
-                byte count = (byte) min(MAX_DIGESTS, digests.size() - i);
+                byte count = (byte) min(maxDigests, digests.size() - i);
                 buffer.position(DATA_POSITION);
                 buffer.put(count);
                 int position;
@@ -121,8 +128,17 @@ public class UdpCommunications implements GossipCommunications {
 
     }
 
-    private static final int    DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
-    private static final int    DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
+    public static final int     DEFAULT_RECEIVE_BUFFER_MULTIPLIER = 4;
+    public static final int     DEFAULT_SEND_BUFFER_MULTIPLIER    = 4;
+
+    // Default MAC key used strictly for message integrity
+    private static byte[]       DEFAULT_KEY_DATA                  = {
+            (byte) 0x23, (byte) 0x45, (byte) 0x83, (byte) 0xad, (byte) 0x23,
+            (byte) 0x46, (byte) 0x83, (byte) 0xad, (byte) 0x23, (byte) 0x45,
+            (byte) 0x83, (byte) 0xad, (byte) 0x23, (byte) 0x45, (byte) 0x83,
+            (byte) 0xad                                          };
+    // Default MAC used strictly for message integrity
+    private static String       DEFAULT_MAC_TYPE                  = "HmacMD5";
     private static final Logger log                               = LoggerFactory.getLogger(UdpCommunications.class);
 
     public static DatagramSocket connect(InetSocketAddress endpoint)
@@ -160,20 +176,44 @@ public class UdpCommunications implements GossipCommunications {
         return baos.toString();
     }
 
+    /**
+     * @return a default mac, with a fixed key. Used for validation only, no
+     *         authentication
+     */
+    protected static Mac defaultMac() {
+        Mac mac;
+        try {
+            mac = Mac.getInstance(DEFAULT_MAC_TYPE);
+            mac.init(new SecretKeySpec(DEFAULT_KEY_DATA, DEFAULT_MAC_TYPE));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(
+                                            String.format("Unable to create default mac %s",
+                                                          DEFAULT_MAC_TYPE));
+        } catch (InvalidKeyException e) {
+            throw new IllegalStateException(
+                                            String.format("Invalid default key %s for default mac %s",
+                                                          Arrays.toString(DEFAULT_KEY_DATA),
+                                                          DEFAULT_MAC_TYPE));
+        }
+        return mac;
+    }
+
     private final ByteBufferPool    bufferPool = new ByteBufferPool(
                                                                     "UDP Comms",
                                                                     100);
     private final ExecutorService   dispatcher;
     private Gossip                  gossip;
-    private final HMAC              hmac;
+    private final Mac               hmac;
     private final InetSocketAddress localAddress;
+    private final int               maxDigests;
+    private final int               payloadByteSize;
     private final AtomicBoolean     running    = new AtomicBoolean();
     private final DatagramSocket    socket;
 
     public UdpCommunications(DatagramSocket socket, ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier, HMAC mac)
-                                                                throws SocketException {
+                             int sendBufferMultiplier, Mac mac)
+                                                               throws SocketException {
         hmac = mac;
         dispatcher = executor;
         this.socket = socket;
@@ -186,29 +226,32 @@ public class UdpCommunications implements GossipCommunications {
             log.error(format("Unable to configure endpoint: %s", socket));
             throw e;
         }
-
+        payloadByteSize = MAX_SEG_SIZE - MESSAGE_HEADER_BYTE_SIZE
+                          - mac.getMacLength();
+        maxDigests = (payloadByteSize - BYTE_SIZE) // 1 byte for #digests
+                     / DIGEST_BYTE_SIZE;
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor) throws SocketException {
         this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, new HMAC());
-    }
-
-    public UdpCommunications(InetSocketAddress endpoint,
-                             ExecutorService executor, HMAC mac)
-                                                                throws SocketException {
-        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
+             DEFAULT_SEND_BUFFER_MULTIPLIER, defaultMac());
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier, HMAC mac)
-                                                                throws SocketException {
+                             int sendBufferMultiplier, Mac mac)
+                                                               throws SocketException {
         this(connect(endpoint), executor, receiveBufferMultiplier,
              sendBufferMultiplier, mac);
+    }
+
+    public UdpCommunications(InetSocketAddress endpoint,
+                             ExecutorService executor, Mac mac)
+                                                               throws SocketException {
+        this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
+             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
     }
 
     @Override
@@ -221,6 +264,14 @@ public class UdpCommunications implements GossipCommunications {
     @Override
     public InetSocketAddress getLocalAddress() {
         return localAddress;
+    }
+
+    /* (non-Javadoc)
+     * @see com.hellblazer.gossip.GossipCommunications#getMaxStateSize()
+     */
+    @Override
+    public int getMaxStateSize() {
+        return MAX_SEG_SIZE - hmac.getMacLength() - UPDATE_HEADER_BYTE_SIZE;
     }
 
     @Override
@@ -258,6 +309,28 @@ public class UdpCommunications implements GossipCommunications {
         ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
         update(RING, state, left, buffer);
         bufferPool.free(buffer);
+    }
+
+    private synchronized void addMac(byte[] data, int offset, int length)
+                                                                         throws ShortBufferException {
+        hmac.reset();
+        hmac.update(data, offset, length);
+        hmac.doFinal(data, offset + length);
+    }
+
+    private synchronized boolean checkMac(byte[] data, int start, int length) {
+        hmac.reset();
+        hmac.update(data, start, length);
+        byte[] checkMAC = hmac.doFinal();
+        int len = checkMAC.length;
+        assert len == hmac.getMacLength();
+
+        for (int i = 0; i < len; i++) {
+            if (checkMAC[i] != data[start + length + i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -378,12 +451,12 @@ public class UdpCommunications implements GossipCommunications {
             return;
         }
         int msgLength = buffer.position();
-        int totalLength = msgLength + MAC_BYTE_SIZE;
+        int totalLength = msgLength + hmac.getMacLength();
         buffer.putInt(0, MAGIC);
         buffer.put(MAGIC_BYTE_SIZE, msgType);
         byte[] bytes = buffer.array();
         try {
-            hmac.addMAC(bytes, 0, msgLength);
+            addMac(bytes, 0, msgLength);
         } catch (ShortBufferException e) {
             log.error("Invalid message %s",
                       prettyPrint(getLocalAddress(), target, buffer.array(),
@@ -447,8 +520,14 @@ public class UdpCommunications implements GossipCommunications {
                 int magic = buffer.getInt();
                 if (MAGIC == magic) {
                     try {
-                        hmac.checkMAC(buffer.array(), 0, packet.getLength()
-                                                         - MAC_BYTE_SIZE);
+                        if (!checkMac(buffer.array(), 0, packet.getLength()
+                                                         - hmac.getMacLength())) {
+                            if (log.isWarnEnabled()) {
+                                log.warn(format("Error processing inbound message on: %s, HMAC does not check",
+                                                getLocalAddress()));
+                            }
+                            return;
+                        }
                     } catch (SecurityException e) {
                         if (log.isWarnEnabled()) {
                             log.warn(format("Error processing inbound message on: %s, HMAC does not check",
@@ -456,7 +535,7 @@ public class UdpCommunications implements GossipCommunications {
                         }
                         return;
                     }
-                    buffer.limit(packet.getLength() - MAC_BYTE_SIZE);
+                    buffer.limit(packet.getLength() - hmac.getMacLength());
                     try {
                         processInbound((InetSocketAddress) packet.getSocketAddress(),
                                        buffer);

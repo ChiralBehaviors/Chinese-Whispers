@@ -14,7 +14,6 @@
  */
 package com.hellblazer.gossip;
 
-import static com.hellblazer.gossip.GossipListener.MAX_STATE_SIZE;
 import static java.lang.String.format;
 
 import java.io.IOException;
@@ -280,6 +279,13 @@ public class Gossip {
     }
 
     /**
+     * @return
+     */
+    public int getMaxStateSize() {
+        return communications.getMaxStateSize();
+    }
+
+    /**
      * Add an identified piece of replicated state to this node
      * 
      * @param replicatedState
@@ -289,11 +295,11 @@ public class Gossip {
         if (replicatedState == null) {
             throw new NullPointerException("replicated state must not be null");
         }
-        if (replicatedState.length > MAX_STATE_SIZE) {
+        if (replicatedState.length > communications.getMaxStateSize()) {
             throw new IllegalArgumentException(
                                                String.format("State size %s must not be > %s",
                                                              replicatedState.length,
-                                                             MAX_STATE_SIZE));
+                                                             communications.getMaxStateSize()));
         }
         UUID id = idGenerator.generate();
         ReplicatedState state = new ReplicatedState(id,
@@ -352,11 +358,11 @@ public class Gossip {
         if (replicatedState == null) {
             throw new NullPointerException("replicated state must not be null");
         }
-        if (replicatedState.length > MAX_STATE_SIZE) {
+        if (replicatedState.length > communications.getMaxStateSize()) {
             throw new IllegalArgumentException(
                                                String.format("State size %s must not be > %s",
                                                              replicatedState.length,
-                                                             MAX_STATE_SIZE));
+                                                             communications.getMaxStateSize()));
         }
         ReplicatedState state = new ReplicatedState(id,
                                                     System.currentTimeMillis(),
