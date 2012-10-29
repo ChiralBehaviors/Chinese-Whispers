@@ -44,7 +44,7 @@ public class GossipTest extends TestCase {
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
         when(communications.getLocalAddress()).thenReturn(localAddress);
-        GossipListener receiver = mock(GossipListener.class);
+        final GossipListener receiver = mock(GossipListener.class);
 
         InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
         InetSocketAddress address2 = new InetSocketAddress("127.0.0.1", 2);
@@ -65,7 +65,22 @@ public class GossipTest extends TestCase {
                                                        new byte[0]));
 
         Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
-                                   TimeUnit.DAYS);
+                                   TimeUnit.DAYS) {
+            @Override
+            protected void notifyRegister(ReplicatedState state) {
+                receiver.register(state.getId(), state.getState());
+            }
+
+            @Override
+            protected void notifyUpdate(ReplicatedState state) {
+                receiver.update(state.getId(), state.getState());
+            }
+
+            @Override
+            protected void notifyDeregister(ReplicatedState state) {
+                receiver.deregister(state.getId());
+            }
+        };
         gossip.setListener(receiver);
 
         gossip.update(state1, address1);
@@ -128,7 +143,7 @@ public class GossipTest extends TestCase {
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
         when(communications.getLocalAddress()).thenReturn(localAddress);
-        GossipListener receiver = mock(GossipListener.class);
+        final GossipListener receiver = mock(GossipListener.class);
 
         InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
         InetSocketAddress address2 = new InetSocketAddress("127.0.0.1", 2);
@@ -149,7 +164,22 @@ public class GossipTest extends TestCase {
                                                        new byte[0]));
 
         Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
-                                   TimeUnit.DAYS);
+                                   TimeUnit.DAYS) {
+            @Override
+            protected void notifyRegister(ReplicatedState state) {
+                receiver.register(state.getId(), state.getState());
+            }
+
+            @Override
+            protected void notifyUpdate(ReplicatedState state) {
+                receiver.update(state.getId(), state.getState());
+            }
+
+            @Override
+            protected void notifyDeregister(ReplicatedState state) {
+                receiver.deregister(state.getId());
+            }
+        };
         gossip.setListener(receiver);
 
         gossip.update(state1, address1);
@@ -219,10 +249,19 @@ public class GossipTest extends TestCase {
 
         Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
                                    TimeUnit.DAYS) {
+            @Override
+            protected void notifyRegister(ReplicatedState state) {
+                receiver.register(state.getId(), state.getState());
+            }
 
             @Override
             protected void notifyUpdate(ReplicatedState state) {
                 receiver.update(state.getId(), state.getState());
+            }
+
+            @Override
+            protected void notifyDeregister(ReplicatedState state) {
+                receiver.deregister(state.getId());
             }
         };
         gossip.setListener(receiver);

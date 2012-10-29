@@ -80,7 +80,7 @@ public class Gossip {
                                                                                                 0L);
     public static final UUID                                 HEARTBEAT               = new UUID(
                                                                                                 0L,
-                                                                                                0L);
+                                                                                                1L);
     public static final int                                  DEFAULT_CLEANUP_CYCLES  = 3;
     public static final int                                  DEFAULT_HEARTBEAT_CYCLE = 1;
     public final static Logger                               log                     = LoggerFactory.getLogger(Gossip.class);
@@ -379,6 +379,36 @@ public class Gossip {
     }
 
     /**
+     * Add the local state indicated by the digetst to the list of deltaState
+     * 
+     * @param deltaState
+     * @param digest
+     */
+    private void addUpdatedLocalState(List<Update> deltaState, Digest digest) {
+        if (ALL_STATES.equals(digest.getId())) {
+            synchronized (localState) {
+                for (ReplicatedState s : localState.values()) {
+                    deltaState.add(new Update(digest.getAddress(), s));
+                }
+            }
+        } else {
+            ReplicatedState myState = null;
+            synchronized (localState) {
+                myState = localState.get(digest.getId());
+            }
+            if (myState != null && myState.getTime() > digest.getTime()) {
+                deltaState.add(new Update(digest.getAddress(), myState));
+            } else if (myState == null) {
+                log.error(String.format("Looking for local %s on %s", digest,
+                                        getLocalAddress()));
+            }
+        }
+    }
+
+    /**
+     * Add the updates for all the local state for this node to the
+     * deltaStateList.
+     * 
      * @param deltaState
      */
     private void updateAllLocalState(List<Update> deltaState) {
@@ -389,6 +419,9 @@ public class Gossip {
         }
     }
 
+    /**
+     * Update the heartbeat state for this node, sending it across the ring
+     */
     private void updateHeartbeat() {
         if (heartbeatCounter++ % heartbeatCycle != 0) {
             return;
@@ -397,51 +430,59 @@ public class Gossip {
             log.trace(String.format("%s updating heartbeat state",
                                     getLocalAddress()));
         }
+        ReplicatedState heartbeat = new ReplicatedState(
+                                                        HEARTBEAT,
+                                                        System.currentTimeMillis(),
+                                                        EMPTY_STATE);
         synchronized (localState) {
-            localState.put(HEARTBEAT,
-                           new ReplicatedState(HEARTBEAT,
-                                               System.currentTimeMillis(),
-                                               EMPTY_STATE));
+            localState.put(HEARTBEAT, heartbeat);
+        }
+        ring.send(new Update(getLocalAddress(), heartbeat));
+    }
+
+    /**
+     * Add the replicated state we maintain for an endpoint indicated by the
+     * digest to the list of deltaState
+     * 
+     * @param endpoint
+     * @param deltaState
+     * @param digest
+     */
+    protected void addUpdatedState(Endpoint endpoint, List<Update> deltaState,
+                                   Digest digest) {
+        ReplicatedState localCopy = endpoint.getState(digest.getId());
+        if (localCopy != null && localCopy.getTime() > digest.getTime()) {
+            if (log.isTraceEnabled()) {
+                log.trace(format("local time stamp %s greater than %s for %s ",
+                                 localCopy.getTime(), digest.getTime(), digest));
+            }
+            deltaState.add(new Update(digest.getAddress(), localCopy));
         }
     }
 
+    /**
+     * Add the replicated state indicated by the digest to the list of
+     * deltaState
+     * 
+     * @param deltaState
+     * @param digest
+     */
     protected void addUpdatedState(List<Update> deltaState, Digest digest) {
         Endpoint endpoint = endpoints.get(digest.getAddress());
         if (endpoint != null) {
-            ReplicatedState localState = endpoint.getState(digest.getId());
-            if (localState != null && localState.getTime() > digest.getTime()) {
-                if (log.isTraceEnabled()) {
-                    log.trace(format("local time stamp %s greater than %s for %s ",
-                                     localState.getTime(), digest.getTime(),
-                                     digest));
-                }
-                deltaState.add(new Update(digest.getAddress(), localState));
-            }
+            addUpdatedState(endpoint, deltaState, digest);
         } else if (getLocalAddress().equals(digest.getAddress())) {
-            if (ALL_STATES.equals(digest.getId())) {
-                synchronized (localState) {
-                    for (ReplicatedState s : localState.values()) {
-                        deltaState.add(new Update(digest.getAddress(), s));
-                    }
-                }
-            } else {
-                ReplicatedState state = null;
-                synchronized (localState) {
-                    state = localState.get(digest.getId());
-                }
-                if (state != null && state.getTime() > digest.getTime()) {
-                    deltaState.add(new Update(digest.getAddress(), state));
-                } else if (state == null) {
-                    log.error(String.format("Looking for local %s on %s",
-                                            digest, getLocalAddress()));
-                }
-            }
+            addUpdatedLocalState(deltaState, digest);
         } else {
             log.error(String.format("Looking for %s on %s", digest,
                                     getLocalAddress()));
         }
     }
 
+    /**
+     * Check the status of the endpoints we know about, updating the ring with
+     * the new state
+     */
     protected void checkStatus() {
         long now = System.currentTimeMillis();
         if (log.isTraceEnabled()) {
@@ -587,10 +628,18 @@ public class Gossip {
         connect(address, endpoint, connectAction);
     }
 
+    /**
+     * Examine all the digests send by a gossiper. Determine whether we have out
+     * of date state and need it from our informant, or whether our informant is
+     * out of date and we need to send the updated state to the informant
+     * 
+     * @param digests
+     * @param gossipHandler
+     */
     protected void examine(Digest[] digests, GossipMessages gossipHandler) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving gossip digests: %s",
-                                    getLocalAddress(), digests));
+                                    getLocalAddress(), Arrays.toString(digests)));
         }
         List<Digest> deltaDigests = new ArrayList<Digest>();
         List<Update> deltaState = new ArrayList<Update>();
@@ -612,16 +661,15 @@ public class Gossip {
                             deltaDigests.add(new Digest(digest.getAddress(),
                                                         localState));
                         } else if (remoteTime < localTime) {
-                            addUpdatedState(deltaState, digest);
+                            addUpdatedState(endpoint, deltaState, digest);
                         }
                     } else {
-                        log.error(String.format("Looking for %s on %s from %s",
-                                                digest, getLocalAddress(),
-                                                gossipHandler.getGossipper()));
+                        deltaDigests.add(new Digest(digest.getAddress(),
+                                                    digest.getId(), -1L));
                     }
                 } else {
                     if (getLocalAddress().equals(digest.getAddress())) {
-                        addUpdatedState(deltaState, digest);
+                        addUpdatedLocalState(deltaState, digest);
                     } else {
                         deltaDigests.add(new Digest(digest.getAddress(),
                                                     digest.getId(), -1L));
@@ -761,6 +809,9 @@ public class Gossip {
     }
 
     /**
+     * Notify the gossip listener of the deregistration of the replicated state.
+     * This is done on a seperate thread
+     * 
      * @param state
      */
     protected void notifyDeregister(final ReplicatedState state) {
@@ -789,6 +840,9 @@ public class Gossip {
     }
 
     /**
+     * Notify the gossip listener of the registration of the replicated state.
+     * This is done on a seperate thread
+     * 
      * @param state
      */
     protected void notifyRegister(final ReplicatedState state) {
@@ -816,6 +870,12 @@ public class Gossip {
         });
     }
 
+    /**
+     * Notify the gossip listener of the update of the replicated state. This is
+     * done on a seperate thread
+     * 
+     * @param state
+     */
     protected void notifyUpdate(final ReplicatedState state) {
         assert state != null;
         if (HEARTBEAT.equals(state.getId())) {
@@ -841,6 +901,12 @@ public class Gossip {
         });
     }
 
+    /**
+     * Answer a randomized digest list of all the replicated state this node
+     * knows of
+     * 
+     * @return
+     */
     protected List<Digest> randomDigests() {
         ArrayList<Digest> digests = new ArrayList<Digest>(endpoints.size() + 1);
         for (Endpoint endpoint : endpoints.values()) {

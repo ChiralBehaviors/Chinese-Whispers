@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.hellblazer.gossip.Gossip.*;
+
 /**
  * The Endpoint keeps track of the replicated state and the failure detector for
  * remote clients
@@ -202,7 +204,7 @@ public class Endpoint implements Comparable<Endpoint> {
         synchronized (states) {
             states.put(newState.getId(), newState);
         }
-        if (fd != null) {
+        if (fd != null && HEARTBEAT.equals(newState.getId())) {
             fd.record(newState.getTime(),
                       System.currentTimeMillis() - newState.getTime());
         }
