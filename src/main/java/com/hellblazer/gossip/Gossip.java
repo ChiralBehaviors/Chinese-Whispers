@@ -619,7 +619,9 @@ public class Gossip {
                                      endpoint.getAddress()));
                 }
                 for (ReplicatedState state : endpoint.getStates()) {
-                    notifyRegister(state);
+                    if (state.getState().length != 0) {
+                        notifyRegister(state);
+                    }
                 }
                 ring.update(endpoints.values());
             }
@@ -846,10 +848,11 @@ public class Gossip {
      * @param state
      */
     protected void notifyRegister(final ReplicatedState state) {
-        assert state != null;
+        assert state != null : "State cannot be null";
         if (HEARTBEAT.equals(state.getId())) {
             return;
         }
+        assert state.getState().length > 0 : "State cannot be zero length";
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying registration of: %s",
                                     getLocalAddress(), state));
@@ -877,10 +880,11 @@ public class Gossip {
      * @param state
      */
     protected void notifyUpdate(final ReplicatedState state) {
-        assert state != null;
+        assert state != null : "State cannot be null";
         if (HEARTBEAT.equals(state.getId())) {
             return;
         }
+        assert state.getState().length > 0 : "State cannot be zero length";
         if (log.isDebugEnabled()) {
             log.debug(String.format("Member: %s notifying update of: %s",
                                     getLocalAddress(), state));
@@ -1006,7 +1010,16 @@ public class Gossip {
             ReplicatedState previousState = endpoint.getState(update.state.getId());
             if (previousState == null) {
                 endpoint.updateState(update.state);
-                notifyRegister(update.state);
+                if (update.state.getState().length == 0) {
+                    // This can happen when state hasn't been replicated to this node but has been deleted
+                    if (log.isDebugEnabled()) {
+                        log.debug(String.format("Received deleted state %s with no prior state on %s via %s",
+                                                update, getLocalAddress(),
+                                                gossiper));
+                    }
+                } else {
+                    notifyRegister(update.state);
+                }
             } else {
                 // TODO this logic is quite slow and unnecessary
                 if (update.state.getTime() > previousState.getTime()) {
