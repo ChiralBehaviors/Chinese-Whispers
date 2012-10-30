@@ -7,16 +7,25 @@
 	<name>Chinese Whispers</name>
 	<description>A UDP based state replication service</description>
 
-	<licenses>
-		<license>
-			<name>Apache License, Version 2.0</name>
-			<url>http://www.apache.org/licenses/LICENSE-2.0</url>
-		</license>
-	</licenses>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
 
-	<scm>
-		<url></url>
-	</scm>
+    <developers>
+        <developer>
+            <name>Hal Hildebrand</name>
+            <email>hal.hildebrand@me.com</email>
+            <organization>Hellbound Productions</organization>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>git://github.com/Hellblazer/Chinese-Whispers.git</connection>
+        <url>https://github.com/Hellblazer/Chinese-Whispers</url>
+    </scm>
 
 	<dependencies>
 		<dependency>
