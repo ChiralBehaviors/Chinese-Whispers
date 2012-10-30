@@ -53,16 +53,16 @@ public class GossipTest extends TestCase {
 
         Update state1 = new Update(address1,
                                    new ReplicatedState(new UUID(666, 1), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 1 }));
         Update state2 = new Update(address2,
                                    new ReplicatedState(new UUID(666, 2), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 2 }));
         Update state3 = new Update(address3,
                                    new ReplicatedState(new UUID(666, 3), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 3 }));
         Update state4 = new Update(address4,
                                    new ReplicatedState(new UUID(666, 4), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 4 }));
 
         Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
                                    TimeUnit.DAYS) {
@@ -152,16 +152,16 @@ public class GossipTest extends TestCase {
 
         Update state1 = new Update(address1,
                                    new ReplicatedState(new UUID(666, 1), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 1 }));
         Update state2 = new Update(address2,
                                    new ReplicatedState(new UUID(666, 2), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 2 }));
         Update state3 = new Update(address3,
                                    new ReplicatedState(new UUID(666, 3), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 3 }));
         Update state4 = new Update(address4,
                                    new ReplicatedState(new UUID(666, 4), 1,
-                                                       new byte[0]));
+                                                       new byte[] { 4 }));
 
         Gossip gossip = new Gossip(communications, view, fdFactory, random, 4,
                                    TimeUnit.DAYS) {
@@ -206,10 +206,14 @@ public class GossipTest extends TestCase {
 
         verifyNoMoreInteractions(communications);
 
-        verify(receiver).register(eq(state1.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state2.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state3.state.getId()), isA(byte[].class));
-        verify(receiver).register(eq(state4.state.getId()), isA(byte[].class));
+        verify(receiver).register(eq(state1.state.getId()),
+                                  eq(state1.state.getState()));
+        verify(receiver).register(eq(state2.state.getId()),
+                                  eq(state2.state.getState()));
+        verify(receiver).register(eq(state3.state.getId()),
+                                  eq(state3.state.getState()));
+        verify(receiver).register(eq(state4.state.getId()),
+                                  eq(state4.state.getState()));
 
         verifyNoMoreInteractions(receiver);
     }
