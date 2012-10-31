@@ -1,7 +1,7 @@
 Chinese-Whispers
 ================
 
-A generic gossip based state replication and failure detection service.  The network transport is UDP.
+A generic gossip based state replication and failure detection service.  The network transport is UDP unicast.
 
 This project is licensed under the [Apache license, version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
