@@ -16,26 +16,25 @@
 
 package com.hellblazer.gossip.configuration;
 
-import static junit.framework.Assert.assertNotNull;
-
+import java.io.IOException;
 import java.io.InputStream;
 
-import org.junit.Test;
-
-import com.hellblazer.gossip.Gossip;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 /**
  * @author hhildebrand
  * 
  */
-public class TestConfiguration {
+public class YamlHelper {
 
-    @Test
-    public void configurationTest() throws Exception {
-        InputStream is = getClass().getResourceAsStream("minimalConfig.yml");
-        GossipConfiguration config = YamlHelper.fromYaml(is);
-        assertNotNull(config);
-        Gossip gossip = config.construct();
-        assertNotNull(gossip);
+    public static GossipConfiguration fromYaml(InputStream yaml)
+                                                                throws JsonParseException,
+                                                                JsonMappingException,
+                                                                IOException {
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        return mapper.readValue(yaml, GossipConfiguration.class);
     }
 }

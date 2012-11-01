@@ -19,8 +19,6 @@ package com.hellblazer.gossip.configuration;
 import static com.hellblazer.gossip.Gossip.DEFAULT_CLEANUP_CYCLES;
 import static com.hellblazer.gossip.Gossip.DEFAULT_HEARTBEAT_CYCLE;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -43,10 +41,6 @@ import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.UUIDTimer;
@@ -83,15 +77,7 @@ public class GossipConfiguration {
         }
     }
 
-    private static Logger log = LoggerFactory.getLogger(GossipConfiguration.class);
-
-    public static GossipConfiguration fromYaml(InputStream yaml)
-                                                                throws JsonParseException,
-                                                                JsonMappingException,
-                                                                IOException {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        return mapper.readValue(yaml, GossipConfiguration.class);
-    }
+    private static Logger         log                     = LoggerFactory.getLogger(GossipConfiguration.class);
 
     public int                    cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
     public int                    commThreads             = 2;
