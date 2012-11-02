@@ -923,7 +923,7 @@ public class Gossip {
         }
         Collections.shuffle(digests, entropy);
         if (log.isTraceEnabled()) {
-            log.trace(format("Gossip digests are : %s", digests));
+            log.trace(format("Random gossip digests are : %s", digests));
         }
         return digests;
     }

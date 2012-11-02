@@ -502,21 +502,24 @@ public class UdpCommunications implements GossipCommunications {
         buffer.order(ByteOrder.BIG_ENDIAN);
         final DatagramPacket packet = new DatagramPacket(buffer.array(),
                                                          buffer.array().length);
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("listening for packet on %s",
+                                    socket.getLocalSocketAddress()));
+        }
         socket.receive(packet);
         buffer.limit(packet.getLength());
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Received packet %s",
+                                    prettyPrint(packet.getSocketAddress(),
+                                                getLocalAddress(),
+                                                buffer.array(),
+                                                packet.getLength())));
+        } else if (log.isTraceEnabled()) {
+            log.trace("Received packet from: " + packet.getSocketAddress());
+        }
         dispatcher.execute(new Runnable() {
             @Override
             public void run() {
-                if (log.isTraceEnabled()) {
-                    log.trace(String.format("Received packet %s",
-                                            prettyPrint(packet.getSocketAddress(),
-                                                        getLocalAddress(),
-                                                        buffer.array(),
-                                                        packet.getLength())));
-                } else if (log.isTraceEnabled()) {
-                    log.trace("Received packet from: "
-                              + packet.getSocketAddress());
-                }
                 int magic = buffer.getInt();
                 if (MAGIC == magic) {
                     try {

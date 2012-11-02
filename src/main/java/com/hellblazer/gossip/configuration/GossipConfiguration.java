@@ -20,14 +20,12 @@ import static com.hellblazer.gossip.Gossip.DEFAULT_CLEANUP_CYCLES;
 import static com.hellblazer.gossip.Gossip.DEFAULT_HEARTBEAT_CYCLE;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -60,46 +58,31 @@ import com.hellblazer.utils.Base64Coder;
  */
 public class GossipConfiguration {
 
-    public static class Address {
-        public InetAddress host;
-        public int         port;
+    private static Logger          log                     = LoggerFactory.getLogger(GossipConfiguration.class);
 
-        public Address() {
-        }
-
-        public Address(int port) {
-            host = new InetSocketAddress(0).getAddress(); //lame
-            this.port = port;
-        }
-
-        public InetSocketAddress toAddress() {
-            return new InetSocketAddress(host, port);
-        }
-    }
-
-    private static Logger         log                     = LoggerFactory.getLogger(GossipConfiguration.class);
-
-    public int                    cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
-    public int                    commThreads             = 2;
-    public Address                endpoint                = new Address(0);
-    public FailureDetectorFactory fdFactory;
-    public int                    gossipInterval          = 3;
-    public String                 gossipUnit              = TimeUnit.SECONDS.name();
-    public int                    heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
-    public String                 hmac;
-    public String                 hmacKey;
-    public String                 networkInterface;
-    public long                   quarantineDelay         = TimeUnit.SECONDS.toMillis(6);
-    public int                    receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
-    public List<Address>          seeds                   = Collections.emptyList();
-    public int                    sendBufferMultiplier    = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
-    public long                   unreachableDelay        = (int) TimeUnit.DAYS.toMillis(2);
+    public int                     cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
+    public int                     commThreads             = 2;
+    public InetSocketAddress       endpoint                = new InetSocketAddress(
+                                                                                   "127.0.0.1",
+                                                                                   0);
+    public FailureDetectorFactory  fdFactory;
+    public int                     gossipInterval          = 1;
+    public String                  gossipUnit              = TimeUnit.SECONDS.name();
+    public int                     heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
+    public String                  hmac;
+    public String                  hmacKey;
+    public String                  networkInterface;
+    public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(6);
+    public int                     receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
+    public List<InetSocketAddress> seeds                   = Collections.emptyList();
+    public int                     sendBufferMultiplier    = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
+    public long                    unreachableDelay        = (int) TimeUnit.DAYS.toMillis(2);
 
     public Gossip construct() throws SocketException {
         Random entropy = new SecureRandom();
         UdpCommunications comms = constructUdpComms();
         SystemView view = new SystemView(entropy, comms.getLocalAddress(),
-                                         getSeeds(), quarantineDelay,
+                                         seeds, quarantineDelay,
                                          unreachableDelay);
         return new Gossip(getUuidGenerator(), comms, view, getFdFactory(),
                           entropy, gossipInterval, getGossipUnit(),
@@ -107,30 +90,28 @@ public class GossipConfiguration {
     }
 
     public UdpCommunications constructUdpComms() throws SocketException {
-        return new UdpCommunications(
-                                     endpoint.toAddress(),
-                                     Executors.newFixedThreadPool(commThreads,
-                                                                  new ThreadFactory() {
-                                                                      int i = 0;
+        ThreadFactory threadFactory = new ThreadFactory() {
+            int i = 0;
 
-                                                                      @Override
-                                                                      public Thread newThread(Runnable arg0) {
-                                                                          Thread daemon = new Thread(
-                                                                                                     String.format("UDP Comms[%s]",
-                                                                                                                   i++));
-                                                                          daemon.setDaemon(true);
-                                                                          daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-                                                                              @Override
-                                                                              public void uncaughtException(Thread t,
-                                                                                                            Throwable e) {
-                                                                                  UdpCommunications.log.error(String.format("Uncaught exception on dispatcher %s",
-                                                                                                                            t),
-                                                                                                              e);
-                                                                              }
-                                                                          });
-                                                                          return daemon;
-                                                                      }
-                                                                  }),
+            @Override
+            public Thread newThread(Runnable runnable) {
+                Thread daemon = new Thread(runnable,
+                                           String.format("UDP Comms[%s]", i++));
+                daemon.setDaemon(true);
+                daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+                    @Override
+                    public void uncaughtException(Thread t, Throwable e) {
+                        UdpCommunications.log.error(String.format("Uncaught exception on dispatcher %s",
+                                                                  t), e);
+                    }
+                });
+                return daemon;
+            }
+        };
+        return new UdpCommunications(
+                                     endpoint,
+                                     Executors.newFixedThreadPool(commThreads,
+                                                                  threadFactory),
                                      receiveBufferMultiplier,
                                      sendBufferMultiplier, getMac());
     }
@@ -140,9 +121,10 @@ public class GossipConfiguration {
             long gossipIntervalMillis = getGossipUnit().toMillis(gossipInterval);
             fdFactory = new AdaptiveFailureDetectorFactory(
                                                            0.9,
-                                                           50,
+                                                           100,
                                                            0.8,
-                                                           cleanupCycles
+                                                           4
+                                                                   * cleanupCycles
                                                                    * gossipIntervalMillis,
                                                            10,
                                                            gossipIntervalMillis);
@@ -168,14 +150,6 @@ public class GossipConfiguration {
                                                           hmacKey, hmac));
         }
         return mac;
-    }
-
-    public List<InetSocketAddress> getSeeds() {
-        List<InetSocketAddress> seedAddresses = new ArrayList<InetSocketAddress>();
-        for (Address a : seeds) {
-            seedAddresses.add(a.toAddress());
-        }
-        return seedAddresses;
     }
 
     public TimeBasedGenerator getUuidGenerator() {

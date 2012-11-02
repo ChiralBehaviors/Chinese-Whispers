@@ -14,25 +14,21 @@
  */
 package com.hellblazer.gossip;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
-import com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory;
+import com.hellblazer.gossip.configuration.GossipConfiguration;
 
 /**
  * Basic end to end testing
@@ -120,9 +116,9 @@ public class EndToEndTest extends TestCase {
             receivers[i] = new Receiver(membership, i);
         }
         List<Gossip> members = new ArrayList<Gossip>();
-        Collection<InetSocketAddress> seedHosts = new ArrayList<InetSocketAddress>();
+        List<InetSocketAddress> seedHosts = new ArrayList<InetSocketAddress>();
         for (int i = 0; i < membership; i++) {
-            members.add(createCommunications(receivers[i], seedHosts, i));
+            members.add(createDefaultCommunications(receivers[i], seedHosts, i));
             if (i == 0) { // always add first member
                 seedHosts.add(members.get(0).getLocalAddress());
             } else if (seedHosts.size() < maxSeeds) {
@@ -163,41 +159,12 @@ public class EndToEndTest extends TestCase {
         assertFalse("state was deregistered", deregistered.get());
     }
 
-    protected Gossip createCommunications(GossipListener receiver,
-                                          Collection<InetSocketAddress> seedHosts,
-                                          int i) throws SocketException {
-        ThreadFactory threadFactory = new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r);
-                t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-                    @Override
-                    public void uncaughtException(Thread t, Throwable e) {
-                        e.printStackTrace();
-                    }
-                });
-                return t;
-            }
-        };
-        UdpCommunications communications = new UdpCommunications(
-                                                                 new InetSocketAddress(
-                                                                                       "127.0.0.1",
-                                                                                       0),
-                                                                 Executors.newFixedThreadPool(2,
-                                                                                              threadFactory));
-
-        SystemView view = new SystemView(new Random(i),
-                                         communications.getLocalAddress(),
-                                         seedHosts, 5000, 500000);
-        FailureDetectorFactory fdFactory = new AdaptiveFailureDetectorFactory(
-                                                                              0.9,
-                                                                              100,
-                                                                              0.8,
-                                                                              12000,
-                                                                              10,
-                                                                              3000);
-        Gossip gossip = new Gossip(communications, view, fdFactory,
-                                   new Random(i + 1), 1, TimeUnit.SECONDS, 3);
+    protected Gossip createDefaultCommunications(GossipListener receiver,
+                                                 List<InetSocketAddress> seedHosts,
+                                                 int i) throws SocketException {
+        GossipConfiguration config = new GossipConfiguration();
+        config.seeds = seedHosts;
+        Gossip gossip = config.construct();
         gossip.setListener(receiver);
         return gossip;
     }

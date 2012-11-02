@@ -1,7 +1,5 @@
 # an example of a minimal gossip configuartion
 
 seeds: 
-    - host: localhost
-      port: 6754
-    - host: localhost
-      port: 6543
+    - localhost:6754
+    - localhost:6543
