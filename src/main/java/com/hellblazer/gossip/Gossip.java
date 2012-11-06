@@ -578,8 +578,7 @@ public class Gossip {
                     view.markAlive(address);
                     // Endpoint has been connected
                     for (ReplicatedState state : endpoint.getStates()) {
-                        if (!HEARTBEAT.equals(state.getId())
-                            && (state.getState().length > 0)) {
+                        if (state.isNotifiable()) {
                             notifyRegister(state);
                         }
                     }
@@ -828,7 +827,7 @@ public class Gossip {
      */
     protected void notifyDeregister(final ReplicatedState state) {
         assert state != null;
-        if (HEARTBEAT.equals(state.getId())) {
+        if (state.isHeartbeat()) {
             return;
         }
         if (log.isDebugEnabled()) {
@@ -859,7 +858,7 @@ public class Gossip {
      */
     protected void notifyRegister(final ReplicatedState state) {
         assert state != null : "State cannot be null";
-        if (HEARTBEAT.equals(state.getId())) {
+        if (state.isHeartbeat()) {
             return;
         }
         assert state.getState().length > 0 : "State cannot be zero length";
@@ -891,7 +890,7 @@ public class Gossip {
      */
     protected void notifyUpdate(final ReplicatedState state) {
         assert state != null : "State cannot be null";
-        if (HEARTBEAT.equals(state.getId())) {
+        if (state.isHeartbeat()) {
             return;
         }
         assert state.getState().length > 0 : "State cannot be zero length";
@@ -1018,45 +1017,7 @@ public class Gossip {
         }
         Endpoint endpoint = endpoints.get(update.node);
         if (endpoint != null) {
-            ReplicatedState previousState = endpoint.getState(update.state.getId());
-            if (previousState == null) {
-                endpoint.updateState(update.state);
-                if (!HEARTBEAT.equals(update.state.getId())) {
-                    if (update.state.getState().length == 0) {
-                        // This can happen when state hasn't been replicated to this node but has been deleted
-                        if (log.isTraceEnabled()) {
-                            log.trace(String.format("Received deleted state %s with no prior state on %s via %s",
-                                                    update, getLocalAddress(),
-                                                    gossiper));
-                        }
-                    } else if (endpoint.isAlive()) {
-                        notifyRegister(update.state);
-                    } else {
-                        if (log.isTraceEnabled()) {
-                            log.trace(String.format("Not notifying registration of %s for %s on %s",
-                                                    update.state.getId(),
-                                                    endpoint, getLocalAddress()));
-                        }
-                    }
-
-                }
-            } else {
-                if (update.state.getTime() > previousState.getTime()) {
-                    long oldTime = previousState.getTime();
-                    endpoint.updateState(update.state);
-                    if (update.state.isEmpty()) {
-                        notifyDeregister(update.state);
-                    } else {
-                        notifyUpdate(update.state);
-                    }
-                    if (log.isTraceEnabled()) {
-                        log.trace(format("Updating state time stamp to %s from %s for %s",
-                                         update.state.getTime(), oldTime,
-                                         update.node));
-                    }
-                    return true;
-                }
-            }
+            endpoint.updateState(update.state, this);
         } else {
             discover(update);
         }
@@ -1086,8 +1047,7 @@ public class Gossip {
                     view.markAlive(gossiper);
                     // Endpoint has been connected
                     for (ReplicatedState state : gossipingEndpoint.getStates()) {
-                        if (!HEARTBEAT.equals(state.getId())
-                            && (state.getState().length > 0)) {
+                        if (state.isNotifiable()) {
                             notifyRegister(state);
                         }
                     }

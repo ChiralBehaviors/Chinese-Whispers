@@ -14,8 +14,6 @@
  */
 package com.hellblazer.gossip;
 
-import static com.hellblazer.gossip.Gossip.HEARTBEAT;
-
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -220,12 +218,29 @@ public class Endpoint implements Comparable<Endpoint> {
         return String.format("Endpoint[%s:%S]", address, state);
     }
 
-    public void updateState(ReplicatedState newState) {
+    public void updateState(ReplicatedState newState, Gossip gossip) {
         assert newState != null : "updated state cannot be null";
         synchronized (states) {
-            states.put(newState.getId(), newState);
+            ReplicatedState prev = states.get(newState.getId());
+            if (prev == null) {
+                states.put(newState.getId(), newState);
+                if (state == State.ALIVE && newState.isNotifiable()) {
+                    gossip.notifyRegister(newState);
+                }
+            } else {
+                if (prev.getTime() < newState.getTime()) {
+                    states.put(newState.getId(), newState);
+                    if (state == State.ALIVE) {
+                        if (newState.isDeleted()) {
+                            gossip.notifyDeregister(newState);
+                        } else if (newState.isNotifiable()) {
+                            gossip.notifyUpdate(newState);
+                        }
+                    }
+                }
+            }
         }
-        if (fd != null && HEARTBEAT.equals(newState.getId())) {
+        if (fd != null && newState.isHeartbeat()) {
             fd.record(newState.getTime(),
                       System.currentTimeMillis() - newState.getTime());
         }

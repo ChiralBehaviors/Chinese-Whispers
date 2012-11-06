@@ -127,4 +127,19 @@ public class ReplicatedState {
         buffer.putLong(id.getLeastSignificantBits());
         buffer.put(state);
     }
+
+    public boolean isHeartbeat() {
+        return Gossip.HEARTBEAT.equals(id);
+    }
+
+    public boolean isNotifiable() {
+        return state.length > 0 && !isHeartbeat();
+    }
+
+    /**
+     * @return
+     */
+    public boolean isDeleted() {
+        return state.length == 0 && !isHeartbeat();
+    }
 }
