@@ -578,7 +578,8 @@ public class Gossip {
                     view.markAlive(address);
                     // Endpoint has been connected
                     for (ReplicatedState state : endpoint.getStates()) {
-                        if (!HEARTBEAT.equals(state.getId())) {
+                        if (!HEARTBEAT.equals(state.getId())
+                            && (state.getState().length > 0)) {
                             notifyRegister(state);
                         }
                     }
@@ -1085,7 +1086,8 @@ public class Gossip {
                     view.markAlive(gossiper);
                     // Endpoint has been connected
                     for (ReplicatedState state : gossipingEndpoint.getStates()) {
-                        if (!HEARTBEAT.equals(state.getId())) {
+                        if (!HEARTBEAT.equals(state.getId())
+                            && (state.getState().length > 0)) {
                             notifyRegister(state);
                         }
                     }
