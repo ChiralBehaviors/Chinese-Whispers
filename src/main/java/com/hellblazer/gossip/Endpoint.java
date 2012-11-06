@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,8 +85,7 @@ public class Endpoint implements Comparable<Endpoint> {
     private final InetSocketAddress          address;
     private final FailureDetector            fd;
     private volatile GossipMessages          handler;
-    private AtomicReference<State>           state     = new AtomicReference<State>(
-                                                                                    State.CONNECTING);
+    private State                            state     = State.CONNECTING;
     private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
     private final AtomicInteger              suspected = new AtomicInteger(0);
 
@@ -176,26 +174,22 @@ public class Endpoint implements Comparable<Endpoint> {
         return address.hashCode();
     }
 
-    public State getEndpointState() {
-        return state.get();
-    }
-
-    public boolean markAlive() {
-        switch (state.get()) {
-            case ALIVE:
-                return false;
-            default:
-                state.set(State.ALIVE);
-                return true;
+    public void markAlive(Runnable action) {
+        synchronized (states) {
+            switch (state) {
+                case ALIVE:
+                    return;
+                default:
+                    state = State.ALIVE;
+                    action.run();
+            }
         }
     }
 
     public void markDead() {
-        state.set(State.DEAD);
-    }
-
-    public void markConnecting() {
-        state.set(State.CONNECTING);
+        synchronized (states) {
+            state = State.DEAD;
+        }
     }
 
     public void setCommunications(GossipMessages communications) {
@@ -223,7 +217,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     @Override
     public String toString() {
-        return String.format("Endpoint[%s:%S]", address, state.get());
+        return String.format("Endpoint[%s:%S]", address, state);
     }
 
     public void updateState(ReplicatedState newState) {
@@ -242,10 +236,8 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public boolean isAlive() {
-        return state.get() == State.ALIVE;
-    }
-
-    public boolean isConnecting() {
-        return state.get() == State.CONNECTING;
+        synchronized (states) {
+            return state == State.ALIVE;
+        }
     }
 }

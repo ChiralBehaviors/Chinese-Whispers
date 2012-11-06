@@ -280,23 +280,23 @@ public class GossipTest extends TestCase {
         gossip.update(new Update(address4, state4), address4);
 
         verify(ep1).getState(state1.getId());
-        verify(ep1).markAlive();
+        verify(ep1).markAlive(isA(Runnable.class));
         verifyNoMoreInteractions(ep1);
 
         verify(ep2).getState(state2.getId());
-        verify(ep2).markAlive();
+        verify(ep2).markAlive(isA(Runnable.class));
         verify(ep2).isAlive();
         verify(ep2).updateState(state2);
         verifyNoMoreInteractions(ep2);
 
         verify(ep3).getState(state3.getId());
-        verify(ep3).markAlive();
+        verify(ep3).markAlive(isA(Runnable.class));
         verify(ep3).isAlive();
         verify(ep3).updateState(state3);
         verifyNoMoreInteractions(ep3);
 
         verify(ep4).getState(state4.getId());
-        verify(ep4).markAlive();
+        verify(ep4).markAlive(isA(Runnable.class));
         verify(ep4).isAlive();
         verify(ep4).updateState(state4);
         verifyNoMoreInteractions(ep4);
