@@ -75,12 +75,7 @@ public class UdpCommunications implements GossipCommunications {
         }
 
         @Override
-        public void close() {
-            // no op
-        }
-
-        @Override
-        public SocketAddress getGossipper() {
+        public InetSocketAddress getGossipper() {
             return gossipper;
         }
 
@@ -255,10 +250,8 @@ public class UdpCommunications implements GossipCommunications {
     }
 
     @Override
-    public void connect(InetSocketAddress address, Endpoint endpoint,
-                        Runnable connectAction) throws IOException {
-        endpoint.setCommunications(new GossipHandler(address));
-        connectAction.run();
+    public GossipHandler handlerFor(InetSocketAddress address) {
+        return new GossipHandler(address);
     }
 
     @Override
@@ -361,12 +354,21 @@ public class UdpCommunications implements GossipCommunications {
     }
 
     private void handleGossip(final InetSocketAddress gossiper, ByteBuffer msg) {
-        gossip.gossip(extractDigests(gossiper, msg),
-                      new GossipHandler(gossiper));
+        Digest[] digests = extractDigests(gossiper, msg);
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Gossip from %s is %s", gossiper,
+                                    Arrays.toString(digests)));
+        }
+        gossip.gossip(digests, new GossipHandler(gossiper));
     }
 
-    private void handleReply(final InetSocketAddress target, ByteBuffer msg) {
-        gossip.reply(extractDigests(target, msg), new GossipHandler(target));
+    private void handleReply(final InetSocketAddress gossiper, ByteBuffer msg) {
+        Digest[] digests = extractDigests(gossiper, msg);
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("Reply from %s is %s", gossiper,
+                                    Arrays.toString(digests)));
+        }
+        gossip.reply(digests, new GossipHandler(gossiper));
     }
 
     /**
@@ -383,7 +385,7 @@ public class UdpCommunications implements GossipCommunications {
             return;
         }
         if (log.isTraceEnabled()) {
-            log.trace(format("Heartbeat state from %s is : %s", this, state));
+            log.trace(format("Ring state from %s is : %s", gossiper, state));
         }
         gossip.ringUpdate(state, gossiper);
     }
@@ -399,7 +401,7 @@ public class UdpCommunications implements GossipCommunications {
             return;
         }
         if (log.isTraceEnabled()) {
-            log.trace(format("Heartbeat state from %s is : %s", this, state));
+            log.trace(format("Update state from %s is : %s", gossiper, state));
         }
         gossip.update(state, gossiper);
     }
@@ -609,5 +611,9 @@ public class UdpCommunications implements GossipCommunications {
         buffer.position(DATA_POSITION);
         state.writeTo(buffer);
         send(msg, buffer, address);
+    }
+
+    public String toString() {
+        return String.format("UdpComms[%s]", getLocalAddress());
     }
 }

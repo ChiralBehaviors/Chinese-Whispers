@@ -14,7 +14,7 @@
  */
 package com.hellblazer.gossip;
 
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.util.List;
 
 /**
@@ -46,7 +46,7 @@ public interface GossipMessages {
     int  UPDATE_HEADER_BYTE_SIZE    = MESSAGE_HEADER_BYTE_SIZE
                                       + INET_ADDRESS_MAX_BYTE_SIZE // endpoint address
                                       + LONG_BYTE_SIZE // timestamp
-                                      + UUID_BYTE_SIZE;    
+                                      + UUID_BYTE_SIZE;
 
     int  MAGIC                      = 0xCAFEBABE;
 
@@ -57,14 +57,9 @@ public interface GossipMessages {
     byte RING                       = 4;
 
     /**
-     * Close the communications connection
-     */
-    void close();
-
-    /**
      * @return
      */
-    SocketAddress getGossipper();
+    InetSocketAddress getGossipper();
 
     /**
      * The first message of the gossip protocol. Send a list of the shuffled

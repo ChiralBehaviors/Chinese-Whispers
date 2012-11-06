@@ -16,7 +16,6 @@ package com.hellblazer.gossip;
 
 import static java.lang.String.format;
 
-import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -399,8 +398,8 @@ public class Gossip {
             if (myState != null && myState.getTime() > digest.getTime()) {
                 deltaState.add(new Update(digest.getAddress(), myState));
             } else if (myState == null) {
-                log.error(String.format("Looking for local %s on %s", digest,
-                                        getLocalAddress()));
+                log.trace(String.format("Looking for deleteded local state %s on %s",
+                                        digest, getLocalAddress()));
             }
         }
     }
@@ -474,8 +473,8 @@ public class Gossip {
         } else if (getLocalAddress().equals(digest.getAddress())) {
             addUpdatedLocalState(deltaState, digest);
         } else {
-            log.error(String.format("Looking for %s on %s", digest,
-                                    getLocalAddress()));
+            log.trace(String.format("Looking for outdated state %s on %s",
+                                    digest, getLocalAddress()));
         }
     }
 
@@ -524,28 +523,6 @@ public class Gossip {
     }
 
     /**
-     * Connect with a member
-     * 
-     * @param address
-     *            - the address of the member
-     * @param endpoint
-     *            - the endpoint representing the member
-     * @param connectAction
-     *            - the action to take when the connection with the member is
-     *            established
-     */
-    protected void connect(final InetSocketAddress address,
-                           final Endpoint endpoint, Runnable connectAction) {
-        try {
-            communications.connect(address, endpoint, connectAction);
-        } catch (IOException e) {
-            if (log.isDebugEnabled()) {
-                log.debug(format("Cannot connect to endpoint %s", address), e);
-            }
-        }
-    }
-
-    /**
      * Connect and gossip with a member that isn't currently connected. As we
      * have no idea what state this member is in, we need to add a digest to the
      * list that is manifestly out of date so that the member, if it responds,
@@ -558,31 +535,56 @@ public class Gossip {
      */
     protected void connectAndGossipWith(final InetSocketAddress address,
                                         final List<Digest> digests) {
-        final Endpoint newEndpoint = new Endpoint(address, fdFactory.create());
-        Runnable connectAction = new Runnable() {
-            @Override
-            public void run() {
-                Endpoint previous = endpoints.putIfAbsent(address, newEndpoint);
-                if (previous != null) {
-                    newEndpoint.getHandler().close();
-                    if (log.isDebugEnabled()) {
-                        log.debug(format("Endpoint already established for %s",
-                                         newEndpoint.getAddress()));
-                    }
-                    return;
-                }
-                view.markAlive(address);
-                if (log.isDebugEnabled()) {
-                    log.debug(format("Member %s is now CONNECTED",
-                                     newEndpoint.getAddress()));
-                }
-                ring.update(endpoints.values());
-                List<Digest> newDigests = new ArrayList<Digest>(digests);
-                newDigests.add(new Digest(address, ALL_STATES, -1)); // We want it all, baby
-                newEndpoint.getHandler().gossip(newDigests);
+        final Endpoint newEndpoint = new Endpoint(
+                                                  address,
+                                                  fdFactory.create(),
+                                                  communications.handlerFor(address));
+        Endpoint previous = endpoints.putIfAbsent(address, newEndpoint);
+        if (previous == null) {
+            if (log.isDebugEnabled()) {
+                log.debug(format("%s connecting and gossiping with %s",
+                                 getLocalAddress(), address));
             }
-        };
-        connect(address, newEndpoint, connectAction);
+            List<Digest> filtered = new ArrayList<Digest>(digests.size());
+            for (Digest digest : digests) {
+                if (!digest.getAddress().equals(address)) {
+                    filtered.add(digest);
+                }
+            }
+            filtered.add(new Digest(address, ALL_STATES, -1)); // We want it all, baby
+            newEndpoint.getHandler().gossip(filtered);
+        }
+    }
+
+    protected void discover(InetSocketAddress address) {
+        Endpoint endpoint = new Endpoint(address, fdFactory.create(),
+                                         communications.handlerFor(address));
+        Endpoint previous = endpoints.putIfAbsent(address, endpoint);
+        if (previous != null) {
+            if (log.isDebugEnabled()) {
+                log.debug(format("Endpoint already established for %s",
+                                 endpoint.getAddress()));
+            }
+            endpoint = previous;
+        } else {
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("%s discovered %s", getLocalAddress(),
+                                        address));
+            }
+        }
+        if (endpoint.markAlive()) {
+            view.markAlive(address);
+            // Endpoint has been connected
+            for (ReplicatedState state : endpoint.getStates()) {
+                if (!HEARTBEAT.equals(state.getId())) {
+                    notifyRegister(state);
+                }
+            }
+            // We want it all, baby
+            endpoint.getHandler().gossip(Arrays.asList(new Digest(address,
+                                                                  ALL_STATES,
+                                                                  -1)));
+        }
     }
 
     /**
@@ -597,37 +599,25 @@ public class Gossip {
         if (getLocalAddress().equals(address)) {
             return; // it's our state, dummy
         }
-        final Endpoint endpoint = new Endpoint(address, update.state,
-                                               fdFactory.create());
-        Runnable connectAction = new Runnable() {
-            @Override
-            public void run() {
-                Endpoint previous = endpoints.putIfAbsent(address, endpoint);
-                if (previous != null) {
-                    if (endpoint.getHandler() != null) {
-                        endpoint.getHandler().close();
-                    }
-                    if (log.isDebugEnabled()) {
-                        log.debug(format("Endpoint already established for %s",
-                                         endpoint.getAddress()));
-                    }
-                    return;
-                }
-                view.markAlive(address);
-                if (log.isDebugEnabled()) {
-                    log.debug(format("Member %s is now UP",
-                                     endpoint.getAddress()));
-                }
-                for (ReplicatedState state : endpoint.getStates()) {
-                    if (state.getState().length != 0) {
-                        notifyRegister(state);
-                    }
-                }
-                ring.update(endpoints.values());
+        Endpoint endpoint = new Endpoint(address, update.state,
+                                         fdFactory.create(),
+                                         communications.handlerFor(address));
+        Endpoint previous = endpoints.putIfAbsent(address, endpoint);
+        if (previous != null) {
+            if (log.isDebugEnabled()) {
+                log.debug(format("Endpoint already established for %s",
+                                 endpoint.getAddress()));
             }
-
-        };
-        connect(address, endpoint, connectAction);
+        } else {
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("%s discovered and connecting with %s",
+                                        getLocalAddress(), address));
+            }
+            // We want it all, baby
+            endpoint.getHandler().gossip(Arrays.asList(new Digest(address,
+                                                                  ALL_STATES,
+                                                                  -1)));
+        }
     }
 
     /**
@@ -723,6 +713,7 @@ public class Gossip {
      *            - the handler to send the reply of digests and states
      */
     protected void gossip(Digest[] digests, GossipMessages gossipHandler) {
+        checkConnectionStatus(gossipHandler.getGossipper());
         Arrays.sort(digests);
         examine(digests, gossipHandler);
     }
@@ -759,7 +750,14 @@ public class Gossip {
         }
         Endpoint endpoint = endpoints.get(address);
         if (endpoint != null) {
-            endpoint.getHandler().gossip(digests);
+            List<Digest> filtered = new ArrayList<Digest>(digests.size());
+            for (Digest digest : digests) {
+                if (!digest.getAddress().equals(address)) {
+                    filtered.add(digest);
+                }
+            }
+            filtered.add(new Digest(address, ALL_STATES, -1)); // We want it all, baby
+            endpoint.getHandler().gossip(filtered);
         } else {
             connectAndGossipWith(address, digests);
         }
@@ -799,7 +797,13 @@ public class Gossip {
                                  getLocalAddress(), endpoint.getAddress(),
                                  digests.size()));
             }
-            endpoint.getHandler().gossip(digests);
+            List<Digest> filtered = new ArrayList<Digest>(digests.size());
+            for (Digest digest : digests) {
+                if (!digest.getAddress().equals(address)) {
+                    filtered.add(digest);
+                }
+            }
+            endpoint.getHandler().gossip(filtered);
             return address;
         }
         if (log.isWarnEnabled()) {
@@ -923,7 +927,8 @@ public class Gossip {
         }
         Collections.shuffle(digests, entropy);
         if (log.isTraceEnabled()) {
-            log.trace(format("Random gossip digests are : %s", digests));
+            log.trace(format("Random gossip digests from %s are : %s",
+                             getLocalAddress(), digests));
         }
         return digests;
     }
@@ -945,8 +950,9 @@ public class Gossip {
     protected void reply(Digest[] digests, GossipMessages gossipHandler) {
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving reply digests: %s",
-                                    getLocalAddress(), digests));
+                                    getLocalAddress(), Arrays.toString(digests)));
         }
+        checkConnectionStatus(gossipHandler.getGossipper());
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
         List<Update> deltaState = new ArrayList();
@@ -980,14 +986,13 @@ public class Gossip {
      * the gossip protocol. The supplied state is the updated state requested by
      * the receiver in response to the digests in the original gossip message.
      * 
-     * TODO More elegant handling of the HEARTBEAT state
-     * 
      * @param update
      *            - the updated state requested from our partner
      * @param gossiper
      * @return true if the state was applied, false otherwise
      */
     protected boolean update(Update update, InetSocketAddress gossiper) {
+        checkConnectionStatus(gossiper);
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving update state: %s",
                                     getLocalAddress(), update));
@@ -1010,15 +1015,24 @@ public class Gossip {
             ReplicatedState previousState = endpoint.getState(update.state.getId());
             if (previousState == null) {
                 endpoint.updateState(update.state);
-                if (update.state.getState().length == 0) {
-                    // This can happen when state hasn't been replicated to this node but has been deleted
-                    if (log.isDebugEnabled()) {
-                        log.debug(String.format("Received deleted state %s with no prior state on %s via %s",
-                                                update, getLocalAddress(),
-                                                gossiper));
+                if (!HEARTBEAT.equals(update.state.getId())) {
+                    if (update.state.getState().length == 0) {
+                        // This can happen when state hasn't been replicated to this node but has been deleted
+                        if (log.isTraceEnabled()) {
+                            log.trace(String.format("Received deleted state %s with no prior state on %s via %s",
+                                                    update, getLocalAddress(),
+                                                    gossiper));
+                        }
+                    } else if (endpoint.isAlive()) {
+                        notifyRegister(update.state);
+                    } else {
+                        if (log.isTraceEnabled()) {
+                            log.trace(String.format("Not notifying registration of %s for %s on %s",
+                                                    update.state.getId(),
+                                                    endpoint, getLocalAddress()));
+                        }
                     }
-                } else {
-                    notifyRegister(update.state);
+
                 }
             } else {
                 // TODO this logic is quite slow and unnecessary
@@ -1042,5 +1056,47 @@ public class Gossip {
             discover(update);
         }
         return false;
+    }
+
+    /**
+     * @param gossiper
+     * @param gossipingEndpoint
+     */
+    protected void checkConnectionStatus(InetSocketAddress gossiper) {
+        Endpoint gossipingEndpoint = endpoints.get(gossiper);
+        if (gossipingEndpoint == null) {
+            if (log.isTraceEnabled()) {
+                log.trace(String.format("%s discovering %s", getLocalAddress(),
+                                        gossiper));
+            }
+            discover(gossiper);
+        } else {
+            if (gossipingEndpoint.markAlive()) {
+                if (log.isDebugEnabled()) {
+                    log.debug(String.format("%s discovered %s",
+                                            getLocalAddress(), gossiper));
+                }
+                view.markAlive(gossiper);
+                // Endpoint has been connected
+                for (ReplicatedState state : gossipingEndpoint.getStates()) {
+                    if (!HEARTBEAT.equals(state.getId())) {
+                        notifyRegister(state);
+                    }
+                }
+                // We want it all, baby
+                gossipingEndpoint.getHandler().gossip(Arrays.asList(new Digest(
+                                                                               gossiper,
+                                                                               ALL_STATES,
+                                                                               -1)));
+            }
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return String.format("Gossip [%s]", getLocalAddress());
     }
 }

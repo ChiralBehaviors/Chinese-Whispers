@@ -14,7 +14,6 @@
  */
 package com.hellblazer.gossip;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 
 /**
@@ -26,24 +25,13 @@ import java.net.InetSocketAddress;
 public interface GossipCommunications {
 
     /**
-     * Asynchronously create a new connection to the indicated address. When the
-     * connection is established, run the connect action.
-     * <p>
-     * Note that this is an asynchronous operation, and the handler will not be
-     * ready for communications unless and until the connectAction is run.
+     * Answer a gossip handler for the address
      * 
      * @param address
-     *            - the address to create a connection to
-     * @param endpoint
-     *            - the endpoint to connect
-     * @param connectAction
-     *            - the action to run when the new connection is fully
-     *            established.
-     * @throws IOException
-     *             - if there is a problem creating a connection to the address
+     *            - the address to connect
+     * @return
      */
-    void connect(InetSocketAddress address, Endpoint endpoint,
-                 Runnable connectAction) throws IOException;
+    GossipMessages handlerFor(InetSocketAddress address);
 
     /**
      * Answer the local address of the communcations endpoint

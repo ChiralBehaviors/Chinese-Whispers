@@ -32,13 +32,14 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
-import org.mockito.ArgumentCaptor;
 import org.mockito.internal.verification.Times;
 
 public class GossipTest extends TestCase {
 
     public void testApplyDeregister() throws Exception {
+        GossipMessages handler = mock(GossipMessages.class);
         GossipCommunications communications = mock(GossipCommunications.class);
+        when(communications.handlerFor(isA(InetSocketAddress.class))).thenReturn(handler);
         FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
@@ -88,19 +89,10 @@ public class GossipTest extends TestCase {
         gossip.update(state3, address1);
         gossip.update(state4, address1);
 
-        ArgumentCaptor<Runnable> connectActions = ArgumentCaptor.forClass(Runnable.class);
-
-        verify(communications).connect(eq(address1), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address2), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address3), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address4), isA(Endpoint.class),
-                                       connectActions.capture());
-        for (Runnable runnable : connectActions.getAllValues()) {
-            runnable.run();
-        }
+        verify(communications).handlerFor(eq(address1));
+        verify(communications).handlerFor(eq(address2));
+        verify(communications).handlerFor(eq(address3));
+        verify(communications).handlerFor(eq(address4));
 
         // Once more with *feeling*
 
@@ -114,12 +106,16 @@ public class GossipTest extends TestCase {
                                                           new byte[0]));
 
         gossip.update(state1, address1);
-        gossip.update(state2, address1);
-        gossip.update(state3, address1);
-        gossip.update(state4, address1);
+        gossip.update(state1, address1);
+        gossip.update(state2, address2);
+        gossip.update(state2, address2);
+        gossip.update(state3, address3);
+        gossip.update(state3, address3);
+        gossip.update(state4, address4);
+        gossip.update(state4, address4);
 
         verify(communications).setGossip(gossip);
-        verify(communications, new Times(5)).getLocalAddress();
+        verify(communications, new Times(4)).getLocalAddress();
 
         verifyNoMoreInteractions(communications);
 
@@ -137,12 +133,14 @@ public class GossipTest extends TestCase {
     }
 
     public void testApplyDiscover() throws Exception {
+        GossipMessages handler = mock(GossipMessages.class);
         GossipCommunications communications = mock(GossipCommunications.class);
         FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
         when(communications.getLocalAddress()).thenReturn(localAddress);
+        when(communications.handlerFor(isA(InetSocketAddress.class))).thenReturn(handler);
         final GossipListener receiver = mock(GossipListener.class);
 
         InetSocketAddress address1 = new InetSocketAddress("127.0.0.1", 1);
@@ -183,26 +181,21 @@ public class GossipTest extends TestCase {
         gossip.setListener(receiver);
 
         gossip.update(state1, address1);
-        gossip.update(state2, address1);
-        gossip.update(state3, address1);
-        gossip.update(state4, address1);
+        gossip.update(state1, address1);
+        gossip.update(state2, address2);
+        gossip.update(state2, address2);
+        gossip.update(state3, address3);
+        gossip.update(state3, address3);
+        gossip.update(state4, address4);
+        gossip.update(state4, address4);
 
-        ArgumentCaptor<Runnable> connectActions = ArgumentCaptor.forClass(Runnable.class);
-
-        verify(communications).connect(eq(address1), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address2), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address3), isA(Endpoint.class),
-                                       connectActions.capture());
-        verify(communications).connect(eq(address4), isA(Endpoint.class),
-                                       connectActions.capture());
-        for (Runnable runnable : connectActions.getAllValues()) {
-            runnable.run();
-        }
+        verify(communications).handlerFor(eq(address1));
+        verify(communications).handlerFor(eq(address2));
+        verify(communications).handlerFor(eq(address3));
+        verify(communications).handlerFor(eq(address4));
 
         verify(communications).setGossip(gossip);
-        verify(communications, new Times(5)).getLocalAddress();
+        verify(communications).getLocalAddress();
 
         verifyNoMoreInteractions(communications);
 
@@ -287,17 +280,24 @@ public class GossipTest extends TestCase {
         gossip.update(new Update(address4, state4), address4);
 
         verify(ep1).getState(state1.getId());
+        verify(ep1).markAlive();
         verifyNoMoreInteractions(ep1);
 
         verify(ep2).getState(state2.getId());
+        verify(ep2).markAlive();
+        verify(ep2).isAlive();
         verify(ep2).updateState(state2);
         verifyNoMoreInteractions(ep2);
 
         verify(ep3).getState(state3.getId());
+        verify(ep3).markAlive();
+        verify(ep3).isAlive();
         verify(ep3).updateState(state3);
         verifyNoMoreInteractions(ep3);
 
         verify(ep4).getState(state4.getId());
+        verify(ep4).markAlive();
+        verify(ep4).isAlive();
         verify(ep4).updateState(state4);
         verifyNoMoreInteractions(ep4);
 
@@ -389,10 +389,14 @@ public class GossipTest extends TestCase {
         @SuppressWarnings("unchecked")
         ConcurrentMap<InetSocketAddress, Endpoint> endpoints = (ConcurrentMap<InetSocketAddress, Endpoint>) ep.get(gossip);
 
-        endpoints.put(address1, new Endpoint(address1, state1, fd));
-        endpoints.put(address2, new Endpoint(address2, state2, fd));
-        endpoints.put(address3, new Endpoint(address3, state3, fd));
-        endpoints.put(address4, new Endpoint(address4, state4, fd));
+        endpoints.put(address1, new Endpoint(address1, state1, fd,
+                                             gossipHandler));
+        endpoints.put(address2, new Endpoint(address2, state2, fd,
+                                             gossipHandler));
+        endpoints.put(address3, new Endpoint(address3, state3, fd,
+                                             gossipHandler));
+        endpoints.put(address4, new Endpoint(address4, state4, fd,
+                                             gossipHandler));
 
         gossip.examine(new Digest[] { digest1, digest2, digest3, digest4 },
                        gossipHandler);

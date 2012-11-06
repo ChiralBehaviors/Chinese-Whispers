@@ -105,6 +105,8 @@ public class EndToEndTest extends TestCase {
 
     private UUID[]                     stateIds;
 
+    private List<Gossip>               members;
+
     public void testEnd2End() throws Exception {
         int membership = 64;
         int maxSeeds = 1;
@@ -115,7 +117,7 @@ public class EndToEndTest extends TestCase {
         for (int i = 0; i < membership; i++) {
             receivers[i] = new Receiver(membership, i);
         }
-        List<Gossip> members = new ArrayList<Gossip>();
+        members = new ArrayList<Gossip>();
         List<InetSocketAddress> seedHosts = new ArrayList<InetSocketAddress>();
         for (int i = 0; i < membership; i++) {
             members.add(createDefaultCommunications(receivers[i], seedHosts, i));
@@ -140,8 +142,9 @@ public class EndToEndTest extends TestCase {
                 id++;
             }
             for (int i = 0; i < membership; i++) {
-                assertTrue("did not receive all notifications for initial iteration",
-                           receivers[i].await(20, TimeUnit.SECONDS));
+                assertTrue(String.format("initial iteration did not receive all notifications for %s",
+                                         members.get(i)),
+                           receivers[i].await(30, TimeUnit.SECONDS));
             }
             System.out.println();
             System.out.println("Initial iteration completed");
@@ -184,7 +187,8 @@ public class EndToEndTest extends TestCase {
             id++;
         }
         for (int i = 0; i < membership; i++) {
-            assertTrue("did not receive all notifications for iteration " + i,
+            assertTrue(String.format("Iteration %s did not receive all notifications for %s",
+                                     i, members.get(i)),
                        receivers[i].await(20, TimeUnit.SECONDS));
         }
     }

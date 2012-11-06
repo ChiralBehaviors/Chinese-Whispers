@@ -14,6 +14,8 @@
  */
 package com.hellblazer.gossip;
 
+import static com.hellblazer.gossip.Gossip.HEARTBEAT;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -24,11 +26,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.hellblazer.gossip.Gossip.*;
 
 /**
  * The Endpoint keeps track of the replicated state and the failure detector for
@@ -39,6 +40,10 @@ import static com.hellblazer.gossip.Gossip.*;
  */
 
 public class Endpoint implements Comparable<Endpoint> {
+    public static enum State {
+        CONNECTING, ALIVE, DEAD;
+    }
+
     protected static Logger logger = LoggerFactory.getLogger(Endpoint.class);
 
     public static int compare(InetSocketAddress o1, InetSocketAddress o2) {
@@ -81,19 +86,31 @@ public class Endpoint implements Comparable<Endpoint> {
     private final InetSocketAddress          address;
     private final FailureDetector            fd;
     private volatile GossipMessages          handler;
-    private volatile boolean                 isAlive   = true;
+    private AtomicReference<State>           state     = new AtomicReference<State>(
+                                                                                    State.CONNECTING);
     private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
     private final AtomicInteger              suspected = new AtomicInteger(0);
 
-    public Endpoint(InetSocketAddress address, FailureDetector failureDetector) {
-        this.address = address;
-        fd = failureDetector;
+    public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
+                    FailureDetector failureDetector, GossipMessages handler) {
+        this(address, failureDetector, handler);
+        states.put(replicatedState.getId(), replicatedState);
     }
 
-    public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
-                    FailureDetector failureDetector) {
-        this(address, failureDetector);
-        states.put(replicatedState.getId(), replicatedState);
+    public Endpoint(InetSocketAddress address) {
+        this(address, null, null);
+    }
+
+    /**
+     * @param address2
+     * @param create
+     * @param handlerFor
+     */
+    public Endpoint(InetSocketAddress address, FailureDetector fd,
+                    GossipMessages handler) {
+        this.address = address;
+        this.fd = fd;
+        this.handler = handler;
     }
 
     /**
@@ -159,16 +176,26 @@ public class Endpoint implements Comparable<Endpoint> {
         return address.hashCode();
     }
 
-    public boolean isAlive() {
-        return isAlive;
+    public State getEndpointState() {
+        return state.get();
     }
 
-    public void markAlive() {
-        isAlive = true;
+    public boolean markAlive() {
+        switch (state.get()) {
+            case ALIVE:
+                return false;
+            default:
+                state.set(State.ALIVE);
+                return true;
+        }
     }
 
     public void markDead() {
-        isAlive = false;
+        state.set(State.DEAD);
+    }
+
+    public void markConnecting() {
+        state.set(State.CONNECTING);
     }
 
     public void setCommunications(GossipMessages communications) {
@@ -196,7 +223,7 @@ public class Endpoint implements Comparable<Endpoint> {
 
     @Override
     public String toString() {
-        return String.format("Endpoint[%s]", address);
+        return String.format("Endpoint[%s:%S]", address, state.get());
     }
 
     public void updateState(ReplicatedState newState) {
@@ -212,5 +239,13 @@ public class Endpoint implements Comparable<Endpoint> {
             logger.trace(String.format("new replicated state time: %s",
                                        newState.getTime()));
         }
+    }
+
+    public boolean isAlive() {
+        return state.get() == State.ALIVE;
+    }
+
+    public boolean isConnecting() {
+        return state.get() == State.CONNECTING;
     }
 }

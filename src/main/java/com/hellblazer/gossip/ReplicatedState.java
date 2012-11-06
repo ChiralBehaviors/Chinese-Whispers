@@ -114,7 +114,8 @@ public class ReplicatedState {
      */
     @Override
     public String toString() {
-        return String.format("ReplicatedState [id=%s, time=%s]", id, time);
+        return String.format("ReplicatedState [id=%s,size=%s,time=%s]", id,
+                             state.length, time);
     }
 
     /**

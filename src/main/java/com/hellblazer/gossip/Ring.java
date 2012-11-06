@@ -30,10 +30,7 @@ public class Ring {
     private static final Logger                      log      = LoggerFactory.getLogger(Ring.class.getCanonicalName());
 
     public Ring(InetSocketAddress address, GossipCommunications comms) {
-        endpoint = new Endpoint(address,
-                                new ReplicatedState(null,
-                                                    System.currentTimeMillis(),
-                                                    null), null);
+        endpoint = new Endpoint(address);
         this.comms = comms;
     }
 
