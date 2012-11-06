@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +85,7 @@ public class Endpoint implements Comparable<Endpoint> {
     private final FailureDetector            fd;
     private volatile GossipMessages          handler;
     private State                            state     = State.CONNECTING;
+    private final ReentrantLock              synch     = new ReentrantLock();
     private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
     private final AtomicInteger              suspected = new AtomicInteger(0);
 
@@ -113,11 +115,16 @@ public class Endpoint implements Comparable<Endpoint> {
      * @param digests
      */
     public void addDigestsTo(ArrayList<Digest> digests) {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             for (ReplicatedState state : states.values()) {
                 digests.add(new Digest(address, state));
             }
+        } finally {
+            myLock.unlock();
         }
+
     }
 
     /* (non-Javadoc)
@@ -145,8 +152,12 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public ReplicatedState getState(UUID id) {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             return states.get(id);
+        } finally {
+            myLock.unlock();
         }
     }
 
@@ -154,8 +165,12 @@ public class Endpoint implements Comparable<Endpoint> {
      * @return
      */
     public Collection<ReplicatedState> getStates() {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             return new ArrayList<ReplicatedState>(states.values());
+        } finally {
+            myLock.unlock();
         }
     }
 
@@ -173,7 +188,9 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public void markAlive(Runnable action) {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             switch (state) {
                 case ALIVE:
                     return;
@@ -181,12 +198,18 @@ public class Endpoint implements Comparable<Endpoint> {
                     state = State.ALIVE;
                     action.run();
             }
+        } finally {
+            myLock.unlock();
         }
     }
 
     public void markDead() {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             state = State.DEAD;
+        } finally {
+            myLock.unlock();
         }
     }
 
@@ -220,11 +243,17 @@ public class Endpoint implements Comparable<Endpoint> {
 
     public void updateState(ReplicatedState newState, Gossip gossip) {
         assert newState != null : "updated state cannot be null";
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             ReplicatedState prev = states.get(newState.getId());
             if (prev == null) {
                 states.put(newState.getId(), newState);
                 if (state == State.ALIVE && newState.isNotifiable()) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(String.format("Notifiying registration of %s for %s",
+                                                   newState.getId(), address));
+                    }
                     gossip.notifyRegister(newState);
                 }
             } else {
@@ -239,10 +268,12 @@ public class Endpoint implements Comparable<Endpoint> {
                     }
                 }
             }
-        }
-        if (fd != null && newState.isHeartbeat()) {
-            fd.record(newState.getTime(),
-                      System.currentTimeMillis() - newState.getTime());
+            if (fd != null && newState.isHeartbeat()) {
+                fd.record(newState.getTime(), System.currentTimeMillis()
+                                              - newState.getTime());
+            }
+        } finally {
+            myLock.unlock();
         }
         if (logger.isTraceEnabled()) {
             logger.trace(String.format("new replicated state time: %s",
@@ -251,8 +282,12 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     public boolean isAlive() {
-        synchronized (states) {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
             return state == State.ALIVE;
+        } finally {
+            myLock.unlock();
         }
     }
 }

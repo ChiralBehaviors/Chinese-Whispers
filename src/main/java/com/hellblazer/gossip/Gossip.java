@@ -557,6 +557,10 @@ public class Gossip {
     }
 
     protected void discover(final InetSocketAddress address) {
+        if (log.isTraceEnabled()) {
+            log.trace(String.format("%s discovering %s", getLocalAddress(),
+                                    address));
+        }
         final Endpoint endpoint = new Endpoint(
                                                address,
                                                fdFactory.create(),
@@ -564,18 +568,18 @@ public class Gossip {
         Endpoint previous = endpoints.putIfAbsent(address, endpoint);
         if (previous != null) {
             if (log.isDebugEnabled()) {
-                log.debug(format("Endpoint already established for %s",
-                                 endpoint.getAddress()));
+                log.debug(format("%s already discovered on %s",
+                                 endpoint.getAddress(), getLocalAddress()));
             }
         } else {
             endpoint.markAlive(new Runnable() {
                 @Override
                 public void run() {
-                    if (log.isDebugEnabled()) {
-                        log.debug(String.format("%s discovered %s",
-                                                getLocalAddress(), address));
-                    }
                     view.markAlive(address);
+                    if (log.isDebugEnabled()) {
+                        log.debug(String.format("%s is now UP on %s (discover)",
+                                                address, getLocalAddress()));
+                    }
                     // Endpoint has been connected
                     for (ReplicatedState state : endpoint.getStates()) {
                         if (state.isNotifiable()) {
@@ -610,8 +614,8 @@ public class Gossip {
         Endpoint previous = endpoints.putIfAbsent(address, endpoint);
         if (previous != null) {
             if (log.isDebugEnabled()) {
-                log.debug(format("Endpoint already established for %s",
-                                 endpoint.getAddress()));
+                log.debug(format("%s already discovered on %s (update)",
+                                 endpoint.getAddress(), getLocalAddress()));
             }
         } else {
             if (log.isDebugEnabled()) {
@@ -996,7 +1000,7 @@ public class Gossip {
      * @param gossiper
      * @return true if the state was applied, false otherwise
      */
-    protected boolean update(Update update, InetSocketAddress gossiper) {
+    protected boolean update(final Update update, InetSocketAddress gossiper) {
         checkConnectionStatus(gossiper);
         if (log.isTraceEnabled()) {
             log.trace(String.format("Member: %s receiving update state: %s",
@@ -1015,9 +1019,9 @@ public class Gossip {
             }
             return false;
         }
-        Endpoint endpoint = endpoints.get(update.node);
+        final Endpoint endpoint = endpoints.get(update.node);
         if (endpoint != null) {
-            endpoint.updateState(update.state, this);
+            endpoint.updateState(update.state, Gossip.this);
         } else {
             discover(update);
         }
@@ -1031,18 +1035,14 @@ public class Gossip {
     protected void checkConnectionStatus(final InetSocketAddress gossiper) {
         final Endpoint gossipingEndpoint = endpoints.get(gossiper);
         if (gossipingEndpoint == null) {
-            if (log.isTraceEnabled()) {
-                log.trace(String.format("%s discovering %s", getLocalAddress(),
-                                        gossiper));
-            }
             discover(gossiper);
         } else {
             gossipingEndpoint.markAlive(new Runnable() {
                 @Override
                 public void run() {
                     if (log.isDebugEnabled()) {
-                        log.debug(String.format("%s discovered %s",
-                                                getLocalAddress(), gossiper));
+                        log.debug(String.format("%s is now UP on %s (check connect)",
+                                                gossiper, getLocalAddress()));
                     }
                     view.markAlive(gossiper);
                     // Endpoint has been connected
