@@ -66,9 +66,9 @@ public class EndToEndTest extends TestCase {
         @Override
         public void register(UUID id, byte[] state) {
             int currentCount = count.incrementAndGet();
-            if (currentCount % 100 == 0) {
+            if (currentCount % 10 == 0) {
                 System.out.print('.');
-            } else if (currentCount % 1000 == 0) {
+            } else if (currentCount % 100 == 0) {
                 System.out.println();
             }
 
@@ -81,9 +81,9 @@ public class EndToEndTest extends TestCase {
             assert state != null;
             // System.out.println("Heartbeat received: " + hb);
             int currentCount = count.incrementAndGet();
-            if (currentCount % 100 == 0) {
+            if (currentCount % 10 == 0) {
                 System.out.print('.');
-            } else if (currentCount % 1000 == 0) {
+            } else if (currentCount % 100 == 0) {
                 System.out.println();
             }
 
@@ -108,7 +108,7 @@ public class EndToEndTest extends TestCase {
     private List<Gossip>               members;
 
     public void testEnd2End() throws Exception {
-        int membership = 64;
+        int membership = 16;
         int maxSeeds = 1;
         Random entropy = new Random(0x1638);
         stateIds = new UUID[membership];
