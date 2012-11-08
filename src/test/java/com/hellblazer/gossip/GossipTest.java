@@ -212,9 +212,9 @@ public class GossipTest extends TestCase {
     }
 
     public void testApplyUpdate() throws Exception {
+        FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
         GossipCommunications communications = mock(GossipCommunications.class);
         final GossipListener receiver = mock(GossipListener.class);
-        FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
@@ -279,22 +279,22 @@ public class GossipTest extends TestCase {
         gossip.update(new Update(address3, state3), address3);
         gossip.update(new Update(address4, state4), address4);
 
-        verify(ep1).markAlive(isA(Runnable.class));
+        verify(ep1).markAlive(isA(Runnable.class), eq(fdFactory));
         verify(ep1).updateState(state1, gossip);
         verifyNoMoreInteractions(ep1);
 
         verify(ep2).updateState(state2, gossip);
-        verify(ep2).markAlive(isA(Runnable.class));
+        verify(ep2).markAlive(isA(Runnable.class), eq(fdFactory));
         verify(ep2).updateState(state2, gossip);
         verifyNoMoreInteractions(ep2);
 
         verify(ep3).updateState(state3, gossip);
-        verify(ep3).markAlive(isA(Runnable.class));
+        verify(ep3).markAlive(isA(Runnable.class), eq(fdFactory));
         verify(ep3).updateState(state3, gossip);
         verifyNoMoreInteractions(ep3);
 
         verify(ep4).updateState(state4, gossip);
-        verify(ep4).markAlive(isA(Runnable.class));
+        verify(ep4).markAlive(isA(Runnable.class), eq(fdFactory));
         verify(ep4).updateState(state4, gossip);
         verifyNoMoreInteractions(ep4);
 
@@ -348,7 +348,6 @@ public class GossipTest extends TestCase {
         GossipCommunications communications = mock(GossipCommunications.class);
         GossipMessages gossipHandler = mock(GossipMessages.class);
         FailureDetectorFactory fdFactory = mock(FailureDetectorFactory.class);
-        FailureDetector fd = mock(FailureDetector.class);
         SystemView view = mock(SystemView.class);
         Random random = mock(Random.class);
         InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 0);
@@ -386,14 +385,10 @@ public class GossipTest extends TestCase {
         @SuppressWarnings("unchecked")
         ConcurrentMap<InetSocketAddress, Endpoint> endpoints = (ConcurrentMap<InetSocketAddress, Endpoint>) ep.get(gossip);
 
-        endpoints.put(address1, new Endpoint(address1, state1, fd,
-                                             gossipHandler));
-        endpoints.put(address2, new Endpoint(address2, state2, fd,
-                                             gossipHandler));
-        endpoints.put(address3, new Endpoint(address3, state3, fd,
-                                             gossipHandler));
-        endpoints.put(address4, new Endpoint(address4, state4, fd,
-                                             gossipHandler));
+        endpoints.put(address1, new Endpoint(address1, state1, gossipHandler));
+        endpoints.put(address2, new Endpoint(address2, state2, gossipHandler));
+        endpoints.put(address3, new Endpoint(address3, state3, gossipHandler));
+        endpoints.put(address4, new Endpoint(address4, state4, gossipHandler));
 
         gossip.examine(new Digest[] { digest1, digest2, digest3, digest4 },
                        gossipHandler);

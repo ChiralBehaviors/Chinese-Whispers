@@ -82,7 +82,7 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     private final InetSocketAddress          address;
-    private final FailureDetector            fd;
+    private FailureDetector            fd;
     private volatile GossipMessages          handler;
     private State                            state     = State.CONNECTING;
     private final ReentrantLock              synch     = new ReentrantLock();
@@ -90,13 +90,13 @@ public class Endpoint implements Comparable<Endpoint> {
     private final AtomicInteger              suspected = new AtomicInteger(0);
 
     public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
-                    FailureDetector failureDetector, GossipMessages handler) {
-        this(address, failureDetector, handler);
+                    GossipMessages handler) {
+        this(address, handler);
         states.put(replicatedState.getId(), replicatedState);
     }
 
     public Endpoint(InetSocketAddress address) {
-        this(address, null, null);
+        this(address, null);
     }
 
     /**
@@ -104,10 +104,8 @@ public class Endpoint implements Comparable<Endpoint> {
      * @param create
      * @param handlerFor
      */
-    public Endpoint(InetSocketAddress address, FailureDetector fd,
-                    GossipMessages handler) {
+    public Endpoint(InetSocketAddress address, GossipMessages handler) {
         this.address = address;
-        this.fd = fd;
         this.handler = handler;
     }
 
@@ -187,7 +185,7 @@ public class Endpoint implements Comparable<Endpoint> {
         return address.hashCode();
     }
 
-    public void markAlive(Runnable action) {
+    public void markAlive(Runnable action, FailureDetectorFactory fdFactory) {
         final ReentrantLock myLock = synch;
         myLock.lock();
         try {
@@ -196,6 +194,7 @@ public class Endpoint implements Comparable<Endpoint> {
                     return;
                 default:
                     state = State.ALIVE;
+                    fd = fdFactory.create();
                     action.run();
             }
         } finally {
@@ -208,6 +207,7 @@ public class Endpoint implements Comparable<Endpoint> {
         myLock.lock();
         try {
             state = State.DEAD;
+            fd = null;
         } finally {
             myLock.unlock();
         }

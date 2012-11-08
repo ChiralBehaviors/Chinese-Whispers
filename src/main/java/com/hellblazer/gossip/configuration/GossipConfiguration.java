@@ -66,13 +66,13 @@ public class GossipConfiguration {
                                                                                    "127.0.0.1",
                                                                                    0);
     public FailureDetectorFactory  fdFactory;
-    public int                     gossipInterval          = 1;
+    public int                     gossipInterval          = 3;
     public String                  gossipUnit              = TimeUnit.SECONDS.name();
     public int                     heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
     public String                  hmac;
     public String                  hmacKey;
     public String                  networkInterface;
-    public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(6);
+    public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(30);
     public int                     receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
     public List<InetSocketAddress> seeds                   = Collections.emptyList();
     public int                     sendBufferMultiplier    = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
@@ -123,7 +123,7 @@ public class GossipConfiguration {
                                                            0.9,
                                                            100,
                                                            0.8,
-                                                           4
+                                                           2
                                                                    * cleanupCycles
                                                                    * gossipIntervalMillis,
                                                            10,

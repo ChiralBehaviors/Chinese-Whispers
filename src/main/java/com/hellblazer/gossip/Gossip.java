@@ -80,7 +80,7 @@ public class Gossip {
     public static final UUID                                 HEARTBEAT               = new UUID(
                                                                                                 0L,
                                                                                                 1L);
-    public static final int                                  DEFAULT_CLEANUP_CYCLES  = 3;
+    public static final int                                  DEFAULT_CLEANUP_CYCLES  = 4;
     public static final int                                  DEFAULT_HEARTBEAT_CYCLE = 1;
     public final static Logger                               log                     = LoggerFactory.getLogger(Gossip.class);
     private static final byte[]                              EMPTY_STATE             = new byte[0];
@@ -537,7 +537,6 @@ public class Gossip {
                                         final List<Digest> digests) {
         final Endpoint newEndpoint = new Endpoint(
                                                   address,
-                                                  fdFactory.create(),
                                                   communications.handlerFor(address));
         Endpoint previous = endpoints.putIfAbsent(address, newEndpoint);
         if (previous == null) {
@@ -563,7 +562,6 @@ public class Gossip {
         }
         final Endpoint endpoint = new Endpoint(
                                                address,
-                                               fdFactory.create(),
                                                communications.handlerFor(address));
         Endpoint previous = endpoints.putIfAbsent(address, endpoint);
         if (previous != null) {
@@ -592,7 +590,7 @@ public class Gossip {
                                                                           ALL_STATES,
                                                                           -1)));
                 }
-            });
+            }, fdFactory);
         }
     }
 
@@ -609,7 +607,6 @@ public class Gossip {
             return; // it's our state, dummy
         }
         Endpoint endpoint = new Endpoint(address, update.state,
-                                         fdFactory.create(),
                                          communications.handlerFor(address));
         Endpoint previous = endpoints.putIfAbsent(address, endpoint);
         if (previous != null) {
@@ -1057,7 +1054,7 @@ public class Gossip {
                                                                                    ALL_STATES,
                                                                                    -1)));
                 }
-            });
+            }, fdFactory);
         }
     }
 
