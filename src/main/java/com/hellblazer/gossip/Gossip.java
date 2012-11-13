@@ -982,9 +982,11 @@ public class Gossip {
      * @param gossiper
      */
     protected void ringUpdate(Update state, InetSocketAddress gossiper) {
-        if (update(state, gossiper)) {
-            ring.send(state);
+        if (getLocalAddress().equals(state.node)) {
+            return; // it's found its way back to us
         }
+        ring.send(state);
+        update(state, gossiper); 
     }
 
     /**
