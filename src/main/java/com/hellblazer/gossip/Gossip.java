@@ -982,11 +982,9 @@ public class Gossip {
      * @param gossiper
      */
     protected void ringUpdate(Update state, InetSocketAddress gossiper) {
-        if (getLocalAddress().equals(state.node)) {
-            return; // it's found its way back to us
-        }
+        assert !getLocalAddress().equals(state.node) : "Should never have received ring state for ourselves";
         ring.send(state);
-        update(state, gossiper); 
+        update(state, gossiper);
     }
 
     /**
@@ -1005,12 +1003,9 @@ public class Gossip {
             log.trace(String.format("Member: %s receiving update state: %s",
                                     getLocalAddress(), update));
         }
-        if (update.node == null) {
-            if (log.isDebugEnabled()) {
-                log.debug(String.format("endpoint address is null: " + update));
-            }
-            return false;
-        }
+        assert update.node != null : String.format("endpoint address is null: "
+                                                   + update);
+        assert !update.node.equals(getLocalAddress()) : "Should not have received a state update we own";
         if (view.isQuarantined(update.node)) {
             if (log.isDebugEnabled()) {
                 log.debug(format("Ignoring gossip for %s because it is a quarantined endpoint",

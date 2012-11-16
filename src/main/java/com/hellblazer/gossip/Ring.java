@@ -42,7 +42,14 @@ public class Ring {
     public void send(Update state) {
         InetSocketAddress target = neighbor.get();
         if (target != null) {
-            comms.update(state, target);
+            if (target.equals(state.node)) {
+                if (log.isTraceEnabled()) {
+                    log.trace(String.format("Not forwarding state %s to the node that owns it",
+                                            state));
+                }
+            } else {
+                comms.update(state, target);
+            }
         } else {
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Ring has not been formed, not forwarding state"));

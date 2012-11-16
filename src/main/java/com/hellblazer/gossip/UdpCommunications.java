@@ -95,8 +95,16 @@ public class UdpCommunications implements GossipCommunications {
             ByteBuffer buffer = bufferPool.allocate(MAX_SEG_SIZE);
             buffer.order(ByteOrder.BIG_ENDIAN);
             for (Update state : deltaState) {
-                UdpCommunications.this.update(UPDATE, state, gossipper, buffer);
-                buffer.clear();
+                if (state.node.equals(gossipper)) {
+                    if (log.isTraceEnabled()) {
+                        log.trace(String.format("Not sending % to the node that owns it",
+                                                state));
+                    }
+                } else {
+                    UdpCommunications.this.update(UPDATE, state, gossipper,
+                                                  buffer);
+                    buffer.clear();
+                }
             }
             bufferPool.free(buffer);
         }
