@@ -24,13 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Ring {
-    private final GossipCommunications                 comms;
-    /*
-     * The neighbors of this node on the virtual ring.  [0] is the node < and [1] is the node > than this node
-     */
-    private final AtomicReference<InetSocketAddress[]> neighbors = new AtomicReference<InetSocketAddress[]>();
-    private final Endpoint                             endpoint;
-    private static final Logger                        log       = LoggerFactory.getLogger(Ring.class.getCanonicalName());
+    private final GossipCommunications               comms;
+    private final AtomicReference<InetSocketAddress> neighbor = new AtomicReference<InetSocketAddress>();
+    private final Endpoint                           endpoint;
+    private static final Logger                      log      = LoggerFactory.getLogger(Ring.class.getCanonicalName());
 
     public Ring(InetSocketAddress address, GossipCommunications comms) {
         endpoint = new Endpoint(address);
@@ -43,46 +40,15 @@ public class Ring {
      * @param state
      */
     public void send(Update state) {
-        InetSocketAddress[] targets = neighbors.get();
-        if (targets != null) {
-            for (InetSocketAddress neighbor : targets) {
-                if (neighbor.equals(state.node)) {
-                    if (log.isTraceEnabled()) {
-                        log.trace(String.format("Not forwarding state %s to the node that owns it",
-                                                state));
-                    }
-                } else {
-                    comms.update(state, neighbor);
-                }
-            }
-        } else {
-            if (log.isTraceEnabled()) {
-                log.trace(String.format("Ring has not been formed, not forwarding state"));
-            }
-        }
-    }
-
-    /**
-     * Send the heartbeat around the ring via the forwarder
-     * 
-     * @param state
-     */
-    public void send(Update state, InetSocketAddress forwarder) {
-        InetSocketAddress[] targets = neighbors.get();
-        if (targets != null) {
-            InetSocketAddress neighbor;
-            if (Endpoint.compare(endpoint.getAddress(), forwarder) < 0) { // if the endpoint  is to the right of the forwarder
-                neighbor = targets[0]; // send to the neighbor that is < our endpoint
-            } else {
-                neighbor = targets[1]; // the forwarder is to the left, send it to the neighbor > our endpoint
-            }
-            if (neighbor.equals(state.node)) {
+        InetSocketAddress target = neighbor.get();
+        if (target != null) {
+            if (target.equals(state.node)) {
                 if (log.isTraceEnabled()) {
                     log.trace(String.format("Not forwarding state %s to the node that owns it",
                                             state));
                 }
             } else {
-                comms.update(state, neighbor);
+                comms.update(state, target);
             }
         } else {
             if (log.isTraceEnabled()) {
@@ -103,27 +69,16 @@ public class Ring {
         members.addAll(endpoints);
         members.remove(endpoint);
         if (members.size() < 3) {
-            neighbors.set(null);
             if (log.isTraceEnabled()) {
                 log.trace(String.format("Ring has not been formed"));
             }
             return;
         }
-
-        InetSocketAddress[] newNeighbors = new InetSocketAddress[2];
         SortedSet<Endpoint> head = members.headSet(endpoint);
         if (!head.isEmpty()) {
-            newNeighbors[0] = head.last().getAddress();
+            neighbor.set(head.last().getAddress());
         } else {
-            newNeighbors[0] = members.last().getAddress();
+            neighbor.set(members.last().getAddress());
         }
-
-        SortedSet<Endpoint> tail = members.tailSet(endpoint);
-        if (!tail.isEmpty()) {
-            newNeighbors[1] = tail.first().getAddress();
-        } else {
-            newNeighbors[1] = members.first().getAddress();
-        }
-        neighbors.set(newNeighbors);
     }
 }
