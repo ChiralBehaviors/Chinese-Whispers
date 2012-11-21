@@ -983,7 +983,7 @@ public class Gossip {
      */
     protected void ringUpdate(Update state, InetSocketAddress gossiper) {
         assert !getLocalAddress().equals(state.node) : "Should never have received ring state for ourselves";
-        ring.send(state);
+        ring.send(state, gossiper);
         update(state, gossiper);
     }
 

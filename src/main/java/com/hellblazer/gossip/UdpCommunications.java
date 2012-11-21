@@ -494,8 +494,10 @@ public class UdpCommunications implements GossipCommunications {
                 }
             }
         } catch (IOException e) {
-            if (log.isWarnEnabled()) {
-                log.warn("Error sending packet", e);
+            if (!e.toString().endsWith("Bad file descriptor")) {
+                if (log.isWarnEnabled()) {
+                    log.warn("Error sending packet", e);
+                }
             }
         }
     }
