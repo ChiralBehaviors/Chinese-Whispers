@@ -15,7 +15,22 @@ See the [project wiki](https://github.com/Hellblazer/Chinese-Whispers/wiki) for 
 
 ### Maven configuration
 
-include the hellblazer snapshot repository:
+For releases, include the hellblazer release repository:
+
+    <repository>
+        <id>hellblazer-release</id>
+        <url>https://repository-hal900000.forge.cloudbees.com/release/</url>
+    </repository>
+    
+add as dependency:
+
+    <dependency>
+        <groupId>com.hellblazer</groupId>
+        <artifactId>chinese-whispers</artifactId>
+        <version>1.0.0</version>
+    </dependency>
+
+For snapshots, include the hellblazer snapshot repository:
 
     <repository>
         <id>hellblazer-snapshots</id>
@@ -27,5 +42,5 @@ add as dependency:
     <dependency>
         <groupId>com.hellblazer</groupId>
         <artifactId>chinese-whispers</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>1.0.1-SNAPSHOT</version>
     </dependency>
