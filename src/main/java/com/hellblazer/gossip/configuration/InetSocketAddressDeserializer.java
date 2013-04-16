@@ -28,26 +28,30 @@ import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
  * 
  */
 public class InetSocketAddressDeserializer extends
-        FromStringDeserializer<InetSocketAddress> {
+		FromStringDeserializer<InetSocketAddress> {
+	private static final long serialVersionUID = 1L;
 
-    protected InetSocketAddressDeserializer() {
-        super(InetSocketAddress.class);
-    }
+	public InetSocketAddressDeserializer() {
+		super(InetSocketAddress.class);
+	}
 
-    /* (non-Javadoc)
-     * @see com.fasterxml.jackson.databind.deser.std.FromStringDeserializer#_deserialize(java.lang.String, com.fasterxml.jackson.databind.DeserializationContext)
-     */
-    @Override
-    protected InetSocketAddress _deserialize(String value,
-                                             DeserializationContext ctxt)
-                                                                         throws IOException,
-                                                                         JsonProcessingException {
-        int i = value.indexOf(':');
-        if (i <= 0) {
-            throw new IOException(String.format("Must include port: %s", value));
-        }
-        int port = Integer.parseInt(value.substring(i + 1));
-        return new InetSocketAddress(value.substring(0, i), port);
-    }
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.fasterxml.jackson.databind.deser.std.FromStringDeserializer#_deserialize
+	 * (java.lang.String, com.fasterxml.jackson.databind.DeserializationContext)
+	 */
+	@Override
+	protected InetSocketAddress _deserialize(String value,
+			DeserializationContext ctxt) throws IOException,
+			JsonProcessingException {
+		int i = value.indexOf(':');
+		if (i <= 0) {
+			throw new IOException(String.format("Must include port: %s", value));
+		}
+		int port = Integer.parseInt(value.substring(i + 1));
+		return new InetSocketAddress(value.substring(0, i), port);
+	}
 
 }

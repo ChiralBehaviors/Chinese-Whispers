@@ -27,6 +27,8 @@ import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
  * 
  */
 public class TimeUnitDeserializer extends FromStringDeserializer<TimeUnit> {
+	private static final long serialVersionUID = 1L;
+	
     public TimeUnitDeserializer() {
         super(TimeUnit.class);
     }
