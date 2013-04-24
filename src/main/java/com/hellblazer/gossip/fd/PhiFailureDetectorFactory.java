@@ -14,6 +14,8 @@
  */
 package com.hellblazer.gossip.fd;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.hellblazer.gossip.FailureDetector;
 import com.hellblazer.gossip.FailureDetectorFactory;
 
@@ -22,33 +24,40 @@ import com.hellblazer.gossip.FailureDetectorFactory;
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
  */
+@JsonSubTypes({ @JsonSubTypes.Type(name = "com.hellblazer.gossip.fd.PhiFailureDectorFactory", value = FailureDetectorFactory.class) })
 public class PhiFailureDetectorFactory implements FailureDetectorFactory {
-    private final double  convictionThreshold;
-    private final int     windowSize;
-    private final long    expectedSampleInterval;
-    private final int     initialSamples;
-    private final double  minimumInterval;
-    private final boolean useMedian;
+	@JsonProperty
+	private double convictionThreshold;
+	@JsonProperty
+	private int windowSize;
+	@JsonProperty
+	private long expectedSampleInterval;
+	@JsonProperty
+	private int initialSamples;
+	@JsonProperty
+	private double minimumInterval;
+	@JsonProperty
+	private boolean useMedian;
+	
+	public PhiFailureDetectorFactory() {
+	}
 
-    public PhiFailureDetectorFactory(double convictionThreshold,
-                                     int windowSize,
-                                     long expectedSampleInterval,
-                                     int initialSamples,
-                                     double minimumInterval, boolean useMedian) {
-        this.convictionThreshold = convictionThreshold;
-        this.windowSize = windowSize;
-        this.expectedSampleInterval = expectedSampleInterval;
-        this.initialSamples = initialSamples;
-        this.minimumInterval = minimumInterval;
-        this.useMedian = useMedian;
-    }
+	public PhiFailureDetectorFactory(double convictionThreshold,
+			int windowSize, long expectedSampleInterval, int initialSamples,
+			double minimumInterval, boolean useMedian) {
+		this.convictionThreshold = convictionThreshold;
+		this.windowSize = windowSize;
+		this.expectedSampleInterval = expectedSampleInterval;
+		this.initialSamples = initialSamples;
+		this.minimumInterval = minimumInterval;
+		this.useMedian = useMedian;
+	}
 
-    @Override
-    public FailureDetector create() {
-        return new PhiAccrualFailureDetector(convictionThreshold, useMedian,
-                                             windowSize,
-                                             expectedSampleInterval,
-                                             initialSamples, minimumInterval);
-    }
+	@Override
+	public FailureDetector create() {
+		return new PhiAccrualFailureDetector(convictionThreshold, useMedian,
+				windowSize, expectedSampleInterval, initialSamples,
+				minimumInterval);
+	}
 
 }

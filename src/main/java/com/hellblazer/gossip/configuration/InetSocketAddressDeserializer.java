@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 /**
  * @author hhildebrand
@@ -47,11 +48,17 @@ public class InetSocketAddressDeserializer extends
 			DeserializationContext ctxt) throws IOException,
 			JsonProcessingException {
 		int i = value.indexOf(':');
-		if (i <= 0) {
-			throw new IOException(String.format("Must include port: %s", value));
+		if (i < 0) {
+			throw new InvalidFormatException(String.format(
+					"Must include port: %s", value), value,
+					InetSocketAddress.class);
 		}
+		String host = value.substring(0, i);
 		int port = Integer.parseInt(value.substring(i + 1));
-		return new InetSocketAddress(value.substring(0, i), port);
+		if (host.isEmpty() || host.equals("*")) {
+			return new InetSocketAddress(port);
+		}
+		return new InetSocketAddress(host, port);
 	}
 
 }

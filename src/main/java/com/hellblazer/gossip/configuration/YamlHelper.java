@@ -19,7 +19,6 @@ package com.hellblazer.gossip.configuration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -47,7 +46,6 @@ public class YamlHelper {
         SimpleModule module = new SimpleModule();
         module.addDeserializer(InetSocketAddress.class,
                                new InetSocketAddressDeserializer());
-        module.addDeserializer(TimeUnit.class, new TimeUnitDeserializer());
         return module;
     }
 }

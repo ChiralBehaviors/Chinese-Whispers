@@ -14,6 +14,8 @@
  */
 package com.hellblazer.gossip.fd;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.hellblazer.gossip.FailureDetector;
 import com.hellblazer.gossip.FailureDetectorFactory;
 
@@ -22,53 +24,60 @@ import com.hellblazer.gossip.FailureDetectorFactory;
  * @author <a href="mailto:hal.hildebrand@gmail.com">Hal Hildebrand</a>
  * 
  */
+@JsonSubTypes({ @JsonSubTypes.Type(name = "com.hellblazer.gossip.fd.AdaptiveFailureDectorFactory", value = FailureDetectorFactory.class) })
 public class AdaptiveFailureDetectorFactory implements FailureDetectorFactory {
-    private final double convictionThreshold;
-    private final int    windowSize;
-    private final long   expectedSampleInterval;
-    private final int    initialSamples;
-    private final double minimumInterval;
-    private final double scale;
+	@JsonProperty
+	private double convictionThreshold;
+	@JsonProperty
+	private int windowSize;
+	@JsonProperty
+	private long expectedSampleInterval;
+	@JsonProperty
+	private int initialSamples;
+	@JsonProperty
+	private double minimumInterval;
+	@JsonProperty
+	private  double scale;
+	
+	public AdaptiveFailureDetectorFactory() {
+	}
 
-    /**
-     * 
-     * @param convictionThreshold
-     *            - the level of certainty that must be met before conviction.
-     *            This value must be <= 1.0
-     * @param windowSize
-     *            - the number of samples in the window
-     * @param scale
-     *            - a scale factor to accomidate the real world
-     * @param expectedSampleInterval
-     *            - the expected sample interval, used to prime the detector
-     * @param initialSamples
-     *            - the number of initial samples to prime the detector
-     * @param minimumInterval
-     *            - the minimum inter arival interval
-     */
-    public AdaptiveFailureDetectorFactory(double convictionThreshold,
-                                          int windowSize, double scale,
-                                          long expectedSampleInterval,
-                                          int initialSamples,
-                                          double minimumInterval) {
-        if (convictionThreshold > 1.0) {
-            throw new IllegalArgumentException(
-                                               String.format("Conviction threshold %s must be <= 1.0",
-                                                             convictionThreshold));
-        }
-        this.convictionThreshold = convictionThreshold;
-        this.windowSize = windowSize;
-        this.expectedSampleInterval = expectedSampleInterval;
-        this.initialSamples = initialSamples;
-        this.minimumInterval = minimumInterval;
-        this.scale = scale;
-    }
+	/**
+	 * 
+	 * @param convictionThreshold
+	 *            - the level of certainty that must be met before conviction.
+	 *            This value must be <= 1.0
+	 * @param windowSize
+	 *            - the number of samples in the window
+	 * @param scale
+	 *            - a scale factor to accomidate the real world
+	 * @param expectedSampleInterval
+	 *            - the expected sample interval, used to prime the detector
+	 * @param initialSamples
+	 *            - the number of initial samples to prime the detector
+	 * @param minimumInterval
+	 *            - the minimum inter arival interval
+	 */
+	public AdaptiveFailureDetectorFactory(double convictionThreshold,
+			int windowSize, double scale, long expectedSampleInterval,
+			int initialSamples, double minimumInterval) {
+		if (convictionThreshold > 1.0) {
+			throw new IllegalArgumentException(String.format(
+					"Conviction threshold %s must be <= 1.0",
+					convictionThreshold));
+		}
+		this.convictionThreshold = convictionThreshold;
+		this.windowSize = windowSize;
+		this.expectedSampleInterval = expectedSampleInterval;
+		this.initialSamples = initialSamples;
+		this.minimumInterval = minimumInterval;
+		this.scale = scale;
+	}
 
-    @Override
-    public FailureDetector create() {
-        return new AdaptiveFailureDetector(convictionThreshold, windowSize,
-                                           scale, expectedSampleInterval,
-                                           initialSamples, minimumInterval);
-    }
+	@Override
+	public FailureDetector create() {
+		return new AdaptiveFailureDetector(convictionThreshold, windowSize,
+				scale, expectedSampleInterval, initialSamples, minimumInterval);
+	}
 
 }

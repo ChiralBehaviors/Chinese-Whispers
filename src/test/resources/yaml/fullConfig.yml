@@ -1,0 +1,21 @@
+cleanupCycles: 5
+commThreads: 10
+endpoint: :0
+gossipInterval: 3
+gossipUnit: SECONDS
+heartbeatCycle: 2
+hmac: HmacMD5
+hmacKey: I0WDrSNGg60jRYOtI0WDrQ==
+quarantineDelay: 30000
+receiveBufferMultiplier: 6
+sendBufferMultiplier: 5
+unreachableDelay: 36000
+
+fdFactory:
+    class: com.hellblazer.gossip.fd.AdaptiveFailureDetectorFactory
+    convictionThreshold: 0.9
+    windowSize: 100
+    scale: 0.8
+    expectedSampleInterval: 20000
+    initialSamples: 10
+    minimumInterval: 3000

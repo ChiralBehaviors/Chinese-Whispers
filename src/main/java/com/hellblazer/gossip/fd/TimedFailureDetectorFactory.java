@@ -14,10 +14,14 @@
  */
 package com.hellblazer.gossip.fd;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.hellblazer.gossip.FailureDetector;
 import com.hellblazer.gossip.FailureDetectorFactory;
 
+@JsonSubTypes({ @JsonSubTypes.Type(name = "com.hellblazer.gossip.fd.TimedFailureDectorFactory", value = FailureDetectorFactory.class) })
 public class TimedFailureDetectorFactory implements FailureDetectorFactory {
+	@JsonProperty
     final long maxInterval;
 
     public TimedFailureDetectorFactory(long maxInterval) {
