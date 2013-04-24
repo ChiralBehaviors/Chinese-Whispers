@@ -5,6 +5,8 @@ A generic gossip based state replication and failure detection service.  The net
 
 This project is licensed under the [Apache license, version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
+Read the [project wiki](https://github.com/Hellblazer/Chinese-Whispers/wiki) for more information on design, configuration and usage.
+
 This project requires Maven version 3.x to build.
 
 To build this project, cd to the root directory and do:
