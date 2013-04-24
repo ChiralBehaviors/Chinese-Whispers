@@ -16,6 +16,8 @@
 
 package com.hellblazer.gossip.configuration;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -32,20 +34,22 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
  * 
  */
 public class YamlHelper {
+	public static GossipConfiguration fromYaml(File yaml)
+			throws JsonParseException, JsonMappingException, IOException {
+		return fromYaml(new FileInputStream(yaml));
+	}
 
-    public static GossipConfiguration fromYaml(InputStream yaml)
-                                                                throws JsonParseException,
-                                                                JsonMappingException,
-                                                                IOException {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        mapper.registerModule(getModule());
-        return mapper.readValue(yaml, GossipConfiguration.class);
-    }
+	public static GossipConfiguration fromYaml(InputStream yaml)
+			throws JsonParseException, JsonMappingException, IOException {
+		ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+		mapper.registerModule(getModule());
+		return mapper.readValue(yaml, GossipConfiguration.class);
+	}
 
-    public static Module getModule() {
-        SimpleModule module = new SimpleModule();
-        module.addDeserializer(InetSocketAddress.class,
-                               new InetSocketAddressDeserializer());
-        return module;
-    }
+	public static Module getModule() {
+		SimpleModule module = new SimpleModule();
+		module.addDeserializer(InetSocketAddress.class,
+				new InetSocketAddressDeserializer());
+		return module;
+	}
 }
