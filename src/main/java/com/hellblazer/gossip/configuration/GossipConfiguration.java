@@ -54,94 +54,95 @@ import com.hellblazer.utils.Base64Coder;
  */
 public class GossipConfiguration {
 
-	private static Logger log = LoggerFactory
-			.getLogger(GossipConfiguration.class);
+    private static Logger log = LoggerFactory
+	    .getLogger(GossipConfiguration.class);
 
-	public int cleanupCycles = DEFAULT_CLEANUP_CYCLES;
-	public int commThreads = 2;
-	public InetSocketAddress endpoint = new InetSocketAddress(0);
-	public FailureDetectorFactory fdFactory;
-	public int gossipInterval = 3;
-	public String gossipUnit = TimeUnit.SECONDS.name();
-	public int heartbeatCycle = DEFAULT_HEARTBEAT_CYCLE;
-	public String hmac = "HmacMD5";
-	public String hmacKey = "I0WDrSNGg60jRYOtI0WDrQ==";
-	public long quarantineDelay = TimeUnit.SECONDS.toMillis(30);
-	public int receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
-	public List<InetSocketAddress> seeds = Collections.emptyList();
-	public int sendBufferMultiplier = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
-	public long unreachableDelay = (int) TimeUnit.DAYS.toMillis(2);
+    public int cleanupCycles = DEFAULT_CLEANUP_CYCLES;
+    public int commThreads = 2;
+    public InetSocketAddress endpoint = new InetSocketAddress(0);
+    public FailureDetectorFactory fdFactory;
+    public int gossipInterval = 3;
+    public String gossipUnit = TimeUnit.SECONDS.name();
+    public int heartbeatCycle = DEFAULT_HEARTBEAT_CYCLE;
+    public String hmac = "HmacMD5";
+    public String hmacKey = "I0WDrSNGg60jRYOtI0WDrQ==";
+    public String networkInterface;
+    public long quarantineDelay = TimeUnit.SECONDS.toMillis(30);
+    public int receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
+    public List<InetSocketAddress> seeds = Collections.emptyList();
+    public int sendBufferMultiplier = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
+    public long unreachableDelay = (int) TimeUnit.DAYS.toMillis(2);
 
-	public Gossip construct() throws SocketException {
-		Random entropy = new SecureRandom();
-		UdpCommunications comms = constructUdpComms();
-		SystemView view = new SystemView(entropy, comms.getLocalAddress(),
-				seeds, quarantineDelay, unreachableDelay);
-		return new Gossip(Generators.timeBasedGenerator(), comms, view,
-				getFdFactory(), entropy, gossipInterval, getGossipUnit(),
-				cleanupCycles, heartbeatCycle);
+    public Gossip construct() throws SocketException {
+	Random entropy = new SecureRandom();
+	UdpCommunications comms = constructUdpComms();
+	SystemView view = new SystemView(entropy, comms.getLocalAddress(),
+		seeds, quarantineDelay, unreachableDelay);
+	return new Gossip(Generators.timeBasedGenerator(), comms, view,
+		getFdFactory(), entropy, gossipInterval, getGossipUnit(),
+		cleanupCycles, heartbeatCycle);
+    }
+
+    public UdpCommunications constructUdpComms() throws SocketException {
+	ThreadFactory threadFactory = new ThreadFactory() {
+	    int i = 0;
+
+	    @Override
+	    public Thread newThread(Runnable runnable) {
+		Thread daemon = new Thread(runnable, String.format(
+			"UDP Comms[%s]", i++));
+		daemon.setDaemon(true);
+		daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+		    @Override
+		    public void uncaughtException(Thread t, Throwable e) {
+			UdpCommunications.log.error(String.format(
+				"Uncaught exception on dispatcher %s", t), e);
+		    }
+		});
+		return daemon;
+	    }
+	};
+	return new UdpCommunications(endpoint, Executors.newFixedThreadPool(
+		commThreads, threadFactory), receiveBufferMultiplier,
+		sendBufferMultiplier, getMac(), networkInterface);
+    }
+
+    public FailureDetectorFactory getFdFactory() {
+	if (fdFactory == null) {
+	    long gossipIntervalMillis = getGossipUnit()
+		    .toMillis(gossipInterval);
+	    fdFactory = new AdaptiveFailureDetectorFactory(0.9, 100, 0.8, 2
+		    * cleanupCycles * gossipIntervalMillis, 10,
+		    gossipIntervalMillis);
 	}
+	return fdFactory;
+    }
 
-	public UdpCommunications constructUdpComms() throws SocketException {
-		ThreadFactory threadFactory = new ThreadFactory() {
-			int i = 0;
-
-			@Override
-			public Thread newThread(Runnable runnable) {
-				Thread daemon = new Thread(runnable, String.format(
-						"UDP Comms[%s]", i++));
-				daemon.setDaemon(true);
-				daemon.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
-					@Override
-					public void uncaughtException(Thread t, Throwable e) {
-						UdpCommunications.log.error(String.format(
-								"Uncaught exception on dispatcher %s", t), e);
-					}
-				});
-				return daemon;
-			}
-		};
-		return new UdpCommunications(endpoint, Executors.newFixedThreadPool(
-				commThreads, threadFactory), receiveBufferMultiplier,
-				sendBufferMultiplier, getMac());
+    public TimeUnit getGossipUnit() {
+	try {
+	    return TimeUnit.valueOf(gossipUnit);
+	} catch (IllegalArgumentException e) {
+	    log.error(String.format("%s is not a legal TimeUnit value"),
+		    gossipUnit);
+	    throw e;
 	}
+    }
 
-	public FailureDetectorFactory getFdFactory() {
-		if (fdFactory == null) {
-			long gossipIntervalMillis = getGossipUnit()
-					.toMillis(gossipInterval);
-			fdFactory = new AdaptiveFailureDetectorFactory(0.9, 100, 0.8, 2
-					* cleanupCycles * gossipIntervalMillis, 10,
-					gossipIntervalMillis);
-		}
-		return fdFactory;
+    public Mac getMac() {
+	if (hmac == null || hmacKey == null) {
+	    return UdpCommunications.defaultMac();
 	}
-
-	public Mac getMac() {
-		if (hmac == null || hmacKey == null) {
-			return UdpCommunications.defaultMac();
-		}
-		Mac mac;
-		try {
-			mac = Mac.getInstance(hmac);
-			mac.init(new SecretKeySpec(Base64Coder.decode(hmacKey), hmac));
-		} catch (NoSuchAlgorithmException e) {
-			throw new IllegalStateException(String.format(
-					"Unable to create mac %s", hmac));
-		} catch (InvalidKeyException e) {
-			throw new IllegalStateException(String.format(
-					"Invalid key %s for mac %s", hmacKey, hmac));
-		}
-		return mac;
+	Mac mac;
+	try {
+	    mac = Mac.getInstance(hmac);
+	    mac.init(new SecretKeySpec(Base64Coder.decode(hmacKey), hmac));
+	} catch (NoSuchAlgorithmException e) {
+	    throw new IllegalStateException(String.format(
+		    "Unable to create mac %s", hmac));
+	} catch (InvalidKeyException e) {
+	    throw new IllegalStateException(String.format(
+		    "Invalid key %s for mac %s", hmacKey, hmac));
 	}
-
-	public TimeUnit getGossipUnit() {
-		try {
-			return TimeUnit.valueOf(gossipUnit);
-		} catch (IllegalArgumentException e) {
-			log.error(String.format("%s is not a legal TimeUnit value"),
-					gossipUnit);
-			throw e;
-		}
-	}
+	return mac;
+    }
 }
