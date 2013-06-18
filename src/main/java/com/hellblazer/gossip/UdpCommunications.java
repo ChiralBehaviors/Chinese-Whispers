@@ -226,6 +226,12 @@ public class UdpCommunications implements GossipCommunications {
 	if (bound.getAddress().isAnyLocalAddress()) {
 	    if (networkInterface == null) {
 		try {
+		    NetworkInterface iface = NetworkInterface.getByIndex(1);
+		    if (iface == null) {
+			throw new IllegalArgumentException(String.format(
+				"Cannot find network interface 1 ",
+				networkInterface));
+		    }
 		    bound = new InetSocketAddress(Inet4Address.getLocalHost(),
 			    bound.getPort());
 		} catch (UnknownHostException e) {
@@ -241,18 +247,10 @@ public class UdpCommunications implements GossipCommunications {
 			    networkInterface));
 		}
 		InetAddress interfaceAddress = null;
-		for (InterfaceAddress address : iface.getInterfaceAddresses()) {
-		    if (address.getAddress().getAddress().length == 4) {
-			interfaceAddress = address.getAddress();
-		    }
-		}
-		if (interfaceAddress == null) {
-		    throw new IllegalStateException(
-			    String.format(
-				    "Unable ot determine bound ip4 address for interface '%s'",
-				    networkInterface));
-		}
-		bound = new InetSocketAddress(interfaceAddress, bound.getPort());
+		interfaceAddress = getAddress(iface);
+		InetSocketAddress endpoint = new InetSocketAddress(
+			interfaceAddress, bound.getPort());
+		bound = endpoint;
 	    }
 	}
 	localAddress = bound;
@@ -267,6 +265,21 @@ public class UdpCommunications implements GossipCommunications {
 		- mac.getMacLength();
 	maxDigests = (payloadByteSize - BYTE_SIZE) // 1 byte for #digests
 		/ DIGEST_BYTE_SIZE;
+    }
+
+    private InetAddress getAddress(NetworkInterface iface) {
+	InetAddress interfaceAddress = null;
+	for (InterfaceAddress address : iface.getInterfaceAddresses()) {
+	    if (address.getAddress().getAddress().length == 4) {
+		interfaceAddress = address.getAddress();
+	    }
+	}
+	if (interfaceAddress == null) {
+	    throw new IllegalStateException(String.format(
+		    "Unable ot determine bound ip4 address for interface '%s'",
+		    iface));
+	}
+	return interfaceAddress;
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
