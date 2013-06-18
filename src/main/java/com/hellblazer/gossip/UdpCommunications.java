@@ -147,7 +147,7 @@ public class UdpCommunications implements GossipCommunications {
     public static DatagramSocket connect(InetSocketAddress endpoint)
                                                                     throws SocketException {
         try {
-            return new DatagramSocket(endpoint.getPort(), endpoint.getAddress());
+            return new DatagramSocket(endpoint);
         } catch (SocketException e) {
             log.error(format("Unable to bind to: %s", endpoint));
             throw e;

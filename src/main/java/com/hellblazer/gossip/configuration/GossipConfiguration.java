@@ -59,7 +59,7 @@ public class GossipConfiguration {
 
 	public int cleanupCycles = DEFAULT_CLEANUP_CYCLES;
 	public int commThreads = 2;
-	public InetSocketAddress endpoint = new InetSocketAddress("127.0.0.1", 0);
+	public InetSocketAddress endpoint = new InetSocketAddress(0);
 	public FailureDetectorFactory fdFactory;
 	public int gossipInterval = 3;
 	public String gossipUnit = TimeUnit.SECONDS.name();
