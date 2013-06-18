@@ -112,7 +112,7 @@ public class GossipTest extends TestCase {
 	gossip.update(state4, address4);
 
 	verify(communications).setGossip(gossip);
-	verify(communications, new Times(4)).getLocalAddress();
+	verify(communications, new Times(16)).getLocalAddress();
 
 	verifyNoMoreInteractions(communications);
 
@@ -189,7 +189,7 @@ public class GossipTest extends TestCase {
 	verify(communications).handlerFor(eq(address4));
 
 	verify(communications).setGossip(gossip);
-	verify(communications, new Times(1)).getLocalAddress();
+	verify(communications, new Times(9)).getLocalAddress();
 
 	verifyNoMoreInteractions(communications);
 
@@ -295,7 +295,7 @@ public class GossipTest extends TestCase {
 
 	verify(communications).setGossip(gossip);
 
-	verify(communications, new Times(1)).getLocalAddress();
+	verify(communications, new Times(5)).getLocalAddress();
 	verifyNoMoreInteractions(communications);
     }
 
