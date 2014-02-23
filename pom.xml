@@ -7,30 +7,30 @@
 	<name>Chinese Whispers</name>
 	<description>A UDP based state replication service</description>
 
-    <licenses>
-        <license>
-            <name>Apache License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
-        </license>
-    </licenses>
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0</url>
+		</license>
+	</licenses>
 
-    <developers>
-        <developer>
-            <name>Hal Hildebrand</name>
-            <email>hal.hildebrand@me.com</email>
-            <organization>Hellbound Productions</organization>
-        </developer>
-    </developers>
+	<developers>
+		<developer>
+			<name>Hal Hildebrand</name>
+			<email>hal.hildebrand@me.com</email>
+			<organization>Hellbound Productions</organization>
+		</developer>
+	</developers>
 
-    <scm>
-        <connection>git://github.com/Hellblazer/Chinese-Whispers.git</connection>
-        <url>https://github.com/Hellblazer/Chinese-Whispers</url>
-    </scm>
-    
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.resources.sourceEncoding>UTF-8</project.resources.sourceEncoding>
-    </properties>
+	<scm>
+		<connection>git://github.com/Hellblazer/Chinese-Whispers.git</connection>
+		<url>https://github.com/Hellblazer/Chinese-Whispers</url>
+	</scm>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.resources.sourceEncoding>UTF-8</project.resources.sourceEncoding>
+	</properties>
 
 	<dependencies>
 		<dependency>
@@ -48,7 +48,7 @@
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-all</artifactId>
 			<version>1.9.0</version>
-            <scope>test</scope>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
@@ -73,6 +73,11 @@
 			</exclusions>
 		</dependency>
 		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-annotations</artifactId>
+			<version>2.2.3</version>
+		</dependency>
+		<dependency>
 			<groupId>com.fasterxml.jackson.dataformat</groupId>
 			<artifactId>jackson-dataformat-yaml</artifactId>
 			<version>2.2.2</version>
@@ -91,10 +96,10 @@
 			<id>hellblazer-snapshots</id>
 			<url>https://repository-hal900000.forge.cloudbees.com/snapshot/</url>
 		</repository>
-        <repository>
-            <id>hellblazer-release</id>
-            <url>https://repository-hal900000.forge.cloudbees.com/release/</url>
-        </repository>
+		<repository>
+			<id>hellblazer-release</id>
+			<url>https://repository-hal900000.forge.cloudbees.com/release/</url>
+		</repository>
 	</repositories>
 
 	<build>

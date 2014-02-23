@@ -20,13 +20,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 /**
@@ -46,14 +43,7 @@ public class YamlHelper {
                                                                 JsonMappingException,
                                                                 IOException {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        mapper.registerModule(getModule());
+        mapper.registerModule(new GossipModule());
         return mapper.readValue(yaml, GossipConfiguration.class);
-    }
-
-    public static Module getModule() {
-        SimpleModule module = new SimpleModule();
-        module.addDeserializer(InetSocketAddress.class,
-                               new InetSocketAddressDeserializer());
-        return module;
     }
 }
