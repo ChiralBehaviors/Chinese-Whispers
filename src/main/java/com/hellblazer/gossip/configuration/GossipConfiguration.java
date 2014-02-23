@@ -35,9 +35,6 @@ import java.util.concurrent.TimeUnit;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.fasterxml.uuid.Generators;
 import com.hellblazer.gossip.Gossip;
 import com.hellblazer.gossip.SystemView;
@@ -52,17 +49,14 @@ import com.hellblazer.utils.fd.impl.AdaptiveFailureDetectorFactory;
  * @author hhildebrand
  * 
  */
-public class GossipConfiguration {
-
-    private static Logger          log                     = LoggerFactory.getLogger(GossipConfiguration.class);
-
+public class GossipConfiguration { 
     public int                     cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
     public int                     commThreads             = 2;
     public InetSocketAddress       endpoint                = new InetSocketAddress(
                                                                                    0);
     public FailureDetectorFactory  fdFactory;
     public int                     gossipInterval          = 3;
-    public String                  gossipUnit              = TimeUnit.SECONDS.name();
+    public TimeUnit                gossipUnit              = TimeUnit.SECONDS;
     public int                     heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
     public String                  hmac                    = "HmacMD5";
     public String                  hmacKey                 = "I0WDrSNGg60jRYOtI0WDrQ==";
@@ -80,8 +74,8 @@ public class GossipConfiguration {
                                          seeds, quarantineDelay,
                                          unreachableDelay);
         return new Gossip(Generators.timeBasedGenerator(), comms, view,
-                          getFdFactory(), entropy, gossipInterval,
-                          getGossipUnit(), cleanupCycles, heartbeatCycle);
+                          getFdFactory(), entropy, gossipInterval, gossipUnit,
+                          cleanupCycles, heartbeatCycle);
     }
 
     public UdpCommunications constructUdpComms() throws SocketException {
@@ -114,7 +108,7 @@ public class GossipConfiguration {
 
     public FailureDetectorFactory getFdFactory() {
         if (fdFactory == null) {
-            long gossipIntervalMillis = getGossipUnit().toMillis(gossipInterval);
+            long gossipIntervalMillis = gossipUnit.toMillis(gossipInterval);
             fdFactory = new AdaptiveFailureDetectorFactory(
                                                            0.9,
                                                            100,
@@ -126,16 +120,6 @@ public class GossipConfiguration {
                                                            gossipIntervalMillis);
         }
         return fdFactory;
-    }
-
-    public TimeUnit getGossipUnit() {
-        try {
-            return TimeUnit.valueOf(gossipUnit);
-        } catch (IllegalArgumentException e) {
-            log.error(String.format("%s is not a legal TimeUnit value"),
-                      gossipUnit);
-            throw e;
-        }
     }
 
     public Mac getMac() {
