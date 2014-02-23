@@ -30,22 +30,21 @@ import com.hellblazer.gossip.Gossip;
  */
 public class TestConfiguration {
 
-	@Test
-	public void testMinimalConfiguration() throws Exception {
-		InputStream is = getClass().getResourceAsStream(
-				"/yaml/minimalConfig.yml");
-		GossipConfiguration config = YamlHelper.fromYaml(is);
-		assertNotNull(config);
-		Gossip gossip = config.construct();
-		assertNotNull(gossip);
-	}
+    @Test
+    public void testFullConfiguration() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/yaml/fullConfig.yml");
+        GossipConfiguration config = YamlHelper.fromYaml(is);
+        assertNotNull(config);
+        Gossip gossip = config.construct();
+        assertNotNull(gossip);
+    }
 
-	@Test
-	public void testFullConfiguration() throws Exception {
-		InputStream is = getClass().getResourceAsStream("/yaml/fullConfig.yml");
-		GossipConfiguration config = YamlHelper.fromYaml(is);
-		assertNotNull(config);
-		Gossip gossip = config.construct();
-		assertNotNull(gossip);
-	}
+    @Test
+    public void testMinimalConfiguration() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/yaml/minimalConfig.yml");
+        GossipConfiguration config = YamlHelper.fromYaml(is);
+        assertNotNull(config);
+        Gossip gossip = config.construct();
+        assertNotNull(gossip);
+    }
 }

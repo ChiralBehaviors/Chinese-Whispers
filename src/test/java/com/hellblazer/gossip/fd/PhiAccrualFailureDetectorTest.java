@@ -16,7 +16,8 @@ package com.hellblazer.gossip.fd;
 
 import junit.framework.TestCase;
 
-import com.hellblazer.gossip.FailureDetector;
+import com.hellblazer.utils.fd.FailureDetector;
+import com.hellblazer.utils.fd.impl.PhiAccrualFailureDetector;
 
 /**
  * Basic testing of the failure detector

@@ -105,8 +105,23 @@ public class ReplicatedState {
         return result;
     }
 
+    /**
+     * @return
+     */
+    public boolean isDeleted() {
+        return state.length == 0 && !isHeartbeat();
+    }
+
     public boolean isEmpty() {
         return state.length == 0;
+    }
+
+    public boolean isHeartbeat() {
+        return Gossip.HEARTBEAT.equals(id);
+    }
+
+    public boolean isNotifiable() {
+        return state.length > 0 && !isHeartbeat();
     }
 
     /* (non-Javadoc)
@@ -126,20 +141,5 @@ public class ReplicatedState {
         buffer.putLong(id.getMostSignificantBits());
         buffer.putLong(id.getLeastSignificantBits());
         buffer.put(state);
-    }
-
-    public boolean isHeartbeat() {
-        return Gossip.HEARTBEAT.equals(id);
-    }
-
-    public boolean isNotifiable() {
-        return state.length > 0 && !isHeartbeat();
-    }
-
-    /**
-     * @return
-     */
-    public boolean isDeleted() {
-        return state.length == 0 && !isHeartbeat();
     }
 }

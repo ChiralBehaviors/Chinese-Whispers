@@ -29,20 +29,20 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
  */
 public class TestInetSocketAddressDeserializer {
 
-	@Test
-	public void testDeserialization() throws Exception {
-		InetSocketAddressDeserializer test = new InetSocketAddressDeserializer();
-		InetSocketAddress address = test._deserialize(":0", null);
-		assertEquals(new InetSocketAddress(0), address);
-		address = test._deserialize("hellblazer.com:666", null);
-		assertEquals(new InetSocketAddress("hellblazer.com", 666), address);
+    @Test
+    public void testDeserialization() throws Exception {
+        InetSocketAddressDeserializer test = new InetSocketAddressDeserializer();
+        InetSocketAddress address = test._deserialize(":0", null);
+        assertEquals(new InetSocketAddress(0), address);
+        address = test._deserialize("hellblazer.com:666", null);
+        assertEquals(new InetSocketAddress("hellblazer.com", 666), address);
 
-		// failure case
-		try {
-			address = test._deserialize("hellblazer.com666", null);
-			fail("Should have failed with a bad format exception");
-		} catch (InvalidFormatException e) {
-			// expected
-		}
-	}
+        // failure case
+        try {
+            address = test._deserialize("hellblazer.com666", null);
+            fail("Should have failed with a bad format exception");
+        } catch (InvalidFormatException e) {
+            // expected
+        }
+    }
 }

@@ -25,6 +25,18 @@ import java.net.InetSocketAddress;
 public interface GossipCommunications {
 
     /**
+     * Answer the local address of the communcations endpoint
+     * 
+     * @return the socket address
+     */
+    InetSocketAddress getLocalAddress();
+
+    /**
+     * @return the maximum byte size for replicated state
+     */
+    int getMaxStateSize();
+
+    /**
      * Answer a gossip handler for the address
      * 
      * @param address
@@ -32,13 +44,6 @@ public interface GossipCommunications {
      * @return
      */
     GossipMessages handlerFor(InetSocketAddress address);
-
-    /**
-     * Answer the local address of the communcations endpoint
-     * 
-     * @return the socket address
-     */
-    InetSocketAddress getLocalAddress();
 
     /**
      * Set the gossip service
@@ -64,9 +69,4 @@ public interface GossipCommunications {
      * @param inetSocketAddress
      */
     void update(Update state, InetSocketAddress inetSocketAddress);
-
-    /**
-     * @return the maximum byte size for replicated state
-     */
-    int getMaxStateSize();
 }

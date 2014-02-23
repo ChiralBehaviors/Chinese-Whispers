@@ -29,36 +29,38 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
  * 
  */
 public class InetSocketAddressDeserializer extends
-		FromStringDeserializer<InetSocketAddress> {
-	private static final long serialVersionUID = 1L;
+        FromStringDeserializer<InetSocketAddress> {
+    private static final long serialVersionUID = 1L;
 
-	public InetSocketAddressDeserializer() {
-		super(InetSocketAddress.class);
-	}
+    public InetSocketAddressDeserializer() {
+        super(InetSocketAddress.class);
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see
-	 * com.fasterxml.jackson.databind.deser.std.FromStringDeserializer#_deserialize
-	 * (java.lang.String, com.fasterxml.jackson.databind.DeserializationContext)
-	 */
-	@Override
-	protected InetSocketAddress _deserialize(String value,
-			DeserializationContext ctxt) throws IOException,
-			JsonProcessingException {
-		int i = value.indexOf(':');
-		if (i < 0) {
-			throw new InvalidFormatException(String.format(
-					"Must include port: %s", value), value,
-					InetSocketAddress.class);
-		}
-		String host = value.substring(0, i);
-		int port = Integer.parseInt(value.substring(i + 1));
-		if (host.isEmpty() || host.equals("*")) {
-			return new InetSocketAddress(port);
-		}
-		return new InetSocketAddress(host, port);
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see
+     * com.fasterxml.jackson.databind.deser.std.FromStringDeserializer#_deserialize
+     * (java.lang.String, com.fasterxml.jackson.databind.DeserializationContext)
+     */
+    @Override
+    protected InetSocketAddress _deserialize(String value,
+                                             DeserializationContext ctxt)
+                                                                         throws IOException,
+                                                                         JsonProcessingException {
+        int i = value.indexOf(':');
+        if (i < 0) {
+            throw new InvalidFormatException(
+                                             String.format("Must include port: %s",
+                                                           value), value,
+                                             InetSocketAddress.class);
+        }
+        String host = value.substring(0, i);
+        int port = Integer.parseInt(value.substring(i + 1));
+        if (host.isEmpty() || host.equals("*")) {
+            return new InetSocketAddress(port);
+        }
+        return new InetSocketAddress(host, port);
+    }
 
 }

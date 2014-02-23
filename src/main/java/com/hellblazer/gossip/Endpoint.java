@@ -29,6 +29,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hellblazer.utils.fd.FailureDetector;
+import com.hellblazer.utils.fd.FailureDetectorFactory;
+
 /**
  * The Endpoint keeps track of the replicated state and the failure detector for
  * remote clients
@@ -82,18 +85,12 @@ public class Endpoint implements Comparable<Endpoint> {
     }
 
     private final InetSocketAddress          address;
-    private FailureDetector            fd;
+    private FailureDetector                  fd;
     private volatile GossipMessages          handler;
     private State                            state     = State.CONNECTING;
     private final ReentrantLock              synch     = new ReentrantLock();
     private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
     private final AtomicInteger              suspected = new AtomicInteger(0);
-
-    public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
-                    GossipMessages handler) {
-        this(address, handler);
-        states.put(replicatedState.getId(), replicatedState);
-    }
 
     public Endpoint(InetSocketAddress address) {
         this(address, null);
@@ -107,6 +104,12 @@ public class Endpoint implements Comparable<Endpoint> {
     public Endpoint(InetSocketAddress address, GossipMessages handler) {
         this.address = address;
         this.handler = handler;
+    }
+
+    public Endpoint(InetSocketAddress address, ReplicatedState replicatedState,
+                    GossipMessages handler) {
+        this(address, handler);
+        states.put(replicatedState.getId(), replicatedState);
     }
 
     /**
@@ -183,6 +186,16 @@ public class Endpoint implements Comparable<Endpoint> {
     @Override
     public int hashCode() {
         return address.hashCode();
+    }
+
+    public boolean isAlive() {
+        final ReentrantLock myLock = synch;
+        myLock.lock();
+        try {
+            return state == State.ALIVE;
+        } finally {
+            myLock.unlock();
+        }
     }
 
     public void markAlive(Runnable action, FailureDetectorFactory fdFactory) {
@@ -278,16 +291,6 @@ public class Endpoint implements Comparable<Endpoint> {
         if (logger.isTraceEnabled()) {
             logger.trace(String.format("new replicated state time: %s",
                                        newState.getTime()));
-        }
-    }
-
-    public boolean isAlive() {
-        final ReentrantLock myLock = synch;
-        myLock.lock();
-        try {
-            return state == State.ALIVE;
-        } finally {
-            myLock.unlock();
         }
     }
 }
