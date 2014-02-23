@@ -18,15 +18,15 @@ package com.hellblazer.gossip.configuration;
 
 import java.net.InetSocketAddress;
 
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.hellblazer.utils.fd.FailureDetectorFactory;
+import com.hellblazer.utils.deserializers.InetSocketAddressDeserializer;
+import com.hellblazer.utils.fd.json.FdFactoryModule;
 
 /**
  * @author hhildebrand
  * 
  */
 
-public class GossipModule extends SimpleModule {
+public class GossipModule extends FdFactoryModule {
 
     private static final long serialVersionUID = 1L;
 
@@ -36,9 +36,6 @@ public class GossipModule extends SimpleModule {
 
     @Override
     public void setupModule(SetupContext context) {
-
-        context.setMixInAnnotations(FailureDetectorFactory.class,
-                                    FdFactoryMixin.class);
         addDeserializer(InetSocketAddress.class,
                         new InetSocketAddressDeserializer());
         super.setupModule(context);
