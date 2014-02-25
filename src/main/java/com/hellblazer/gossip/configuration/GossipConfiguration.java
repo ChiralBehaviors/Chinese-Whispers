@@ -20,7 +20,10 @@ import static com.hellblazer.gossip.Gossip.DEFAULT_CLEANUP_CYCLES;
 import static com.hellblazer.gossip.Gossip.DEFAULT_HEARTBEAT_CYCLE;
 
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -34,6 +37,9 @@ import java.util.concurrent.TimeUnit;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.uuid.Generators;
 import com.hellblazer.gossip.Gossip;
@@ -50,6 +56,8 @@ import com.hellblazer.utils.fd.impl.AdaptiveFailureDetectorFactory;
  * 
  */
 public class GossipConfiguration {
+    private static final Logger    log                     = LoggerFactory.getLogger(GossipConfiguration.class);
+
     public int                     cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
     public int                     commThreads             = 2;
     public InetSocketAddress       endpoint                = new InetSocketAddress(
@@ -59,8 +67,9 @@ public class GossipConfiguration {
     public int                     gossipInterval          = 3;
     public TimeUnit                gossipUnit              = TimeUnit.SECONDS;
     public int                     heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
-    public String                  hmac                    = "HmacMD5";
-    public String                  hmacKey                 = "I0WDrSNGg60jRYOtI0WDrQ==";
+    public String                  hmac;
+    public String                  hmacKey;
+    public String                  networkInterface;
     public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(30);
     public int                     receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
     public List<InetSocketAddress> seeds                   = Collections.emptyList();
@@ -98,11 +107,40 @@ public class GossipConfiguration {
             }
         };
         return new UdpCommunications(
-                                     endpoint,
+                                     getEndpoint(),
                                      Executors.newFixedThreadPool(commThreads,
                                                                   threadFactory),
                                      receiveBufferMultiplier,
                                      sendBufferMultiplier, getMac());
+    }
+
+    public InetSocketAddress getEndpoint() throws SocketException {
+        if (endpoint.getAddress().isAnyLocalAddress()) {
+            if (networkInterface == null) {
+                NetworkInterface iface = NetworkInterface.getByIndex(1);
+                if (iface == null) {
+                    log.error("Supplied ANY address for endpoint: %s with no networkInterface defined, cannot find network interface 1");
+                    throw new IllegalArgumentException(
+                                                       "Supplied ANY address for endpoint: %s with no networkInterface defined, cannot find network interface 1 ");
+                }
+                log.warn(String.format("Supplied ANY address for endpoint: %s with no networkInterface defined, using %s",
+                                       endpoint, iface));
+                return new InetSocketAddress(getAddress(iface),
+                                             endpoint.getPort());
+            } else {
+                NetworkInterface iface = NetworkInterface.getByName(networkInterface);
+                if (iface == null) {
+                    log.error(String.format("Cannot find network interface: %s ",
+                                            networkInterface));
+                    throw new IllegalArgumentException(
+                                                       String.format("Cannot find network interface: %s ",
+                                                                     networkInterface));
+                }
+                return new InetSocketAddress(getAddress(iface),
+                                             endpoint.getPort());
+            }
+        }
+        return endpoint;
     }
 
     public FailureDetectorFactory getFdFactory() {
@@ -130,14 +168,31 @@ public class GossipConfiguration {
             mac = Mac.getInstance(hmac);
             mac.init(new SecretKeySpec(Base64Coder.decode(hmacKey), hmac));
         } catch (NoSuchAlgorithmException e) {
+            log.error(String.format("Unable to create mac %s", hmac));
             throw new IllegalStateException(
                                             String.format("Unable to create mac %s",
                                                           hmac));
         } catch (InvalidKeyException e) {
+            log.error(String.format("Invalid key %s for mac %s", hmacKey, hmac));
             throw new IllegalStateException(
                                             String.format("Invalid key %s for mac %s",
                                                           hmacKey, hmac));
         }
         return mac;
+    }
+
+    private InetAddress getAddress(NetworkInterface iface) {
+        InetAddress interfaceAddress = null;
+        for (InterfaceAddress address : iface.getInterfaceAddresses()) {
+            if (address.getAddress().getAddress().length == 4) {
+                interfaceAddress = address.getAddress();
+            }
+        }
+        if (interfaceAddress == null) {
+            throw new IllegalStateException(
+                                            String.format("Unable ot determine bound ip4 address for interface '%s'",
+                                                          iface));
+        }
+        return interfaceAddress;
     }
 }
