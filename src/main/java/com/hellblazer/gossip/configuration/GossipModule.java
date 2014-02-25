@@ -34,6 +34,10 @@ public class GossipModule extends FdFactoryModule {
         super("GossipModule");
     }
 
+    public GossipModule(String name) {
+        super(name);
+    }
+
     @Override
     public void setupModule(SetupContext context) {
         addDeserializer(InetSocketAddress.class,
