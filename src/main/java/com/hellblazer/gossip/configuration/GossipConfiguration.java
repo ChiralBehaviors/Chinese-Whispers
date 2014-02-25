@@ -49,10 +49,11 @@ import com.hellblazer.utils.fd.impl.AdaptiveFailureDetectorFactory;
  * @author hhildebrand
  * 
  */
-public class GossipConfiguration { 
+public class GossipConfiguration {
     public int                     cleanupCycles           = DEFAULT_CLEANUP_CYCLES;
     public int                     commThreads             = 2;
     public InetSocketAddress       endpoint                = new InetSocketAddress(
+                                                                                   "localhost",
                                                                                    0);
     public FailureDetectorFactory  fdFactory;
     public int                     gossipInterval          = 3;
@@ -60,7 +61,6 @@ public class GossipConfiguration {
     public int                     heartbeatCycle          = DEFAULT_HEARTBEAT_CYCLE;
     public String                  hmac                    = "HmacMD5";
     public String                  hmacKey                 = "I0WDrSNGg60jRYOtI0WDrQ==";
-    public String                  networkInterface;
     public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(30);
     public int                     receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
     public List<InetSocketAddress> seeds                   = Collections.emptyList();
@@ -102,8 +102,7 @@ public class GossipConfiguration {
                                      Executors.newFixedThreadPool(commThreads,
                                                                   threadFactory),
                                      receiveBufferMultiplier,
-                                     sendBufferMultiplier, getMac(),
-                                     networkInterface);
+                                     sendBufferMultiplier, getMac());
     }
 
     public FailureDetectorFactory getFdFactory() {

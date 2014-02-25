@@ -87,7 +87,7 @@ public class Endpoint implements Comparable<Endpoint> {
     private final InetSocketAddress          address;
     private FailureDetector                  fd;
     private volatile GossipMessages          handler;
-    private State                            state     = State.CONNECTING;
+    private volatile State                   state     = State.CONNECTING;
     private final ReentrantLock              synch     = new ReentrantLock();
     private final Map<UUID, ReplicatedState> states    = new HashMap<UUID, ReplicatedState>();
     private final AtomicInteger              suspected = new AtomicInteger(0);

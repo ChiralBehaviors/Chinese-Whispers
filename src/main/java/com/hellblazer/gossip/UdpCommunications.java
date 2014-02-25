@@ -34,13 +34,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.InvalidKeyException;
@@ -218,45 +214,19 @@ public class UdpCommunications implements GossipCommunications {
 
     public UdpCommunications(DatagramSocket socket, ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier, Mac mac,
-                             String networkInterface) throws SocketException {
+                             int sendBufferMultiplier, Mac mac)
+                                                               throws SocketException {
+        if (socket.getLocalAddress().isAnyLocalAddress()) {
+            throw new IllegalArgumentException(
+                                               String.format("UDP Communications do not work with a socket bound to %s address",
+                                                             socket.getLocalAddress()));
+        }
         hmac = mac;
         dispatcher = executor;
         this.socket = socket;
         InetSocketAddress bound = new InetSocketAddress(
                                                         socket.getLocalAddress(),
                                                         socket.getLocalPort());
-        if (bound.getAddress().isAnyLocalAddress()) {
-            if (networkInterface == null) {
-                try {
-                    NetworkInterface iface = NetworkInterface.getByIndex(1);
-                    if (iface == null) {
-                        throw new IllegalArgumentException(
-                                                           String.format("Cannot find network interface 1 ",
-                                                                         networkInterface));
-                    }
-                    bound = new InetSocketAddress(InetAddress.getLocalHost(),
-                                                  bound.getPort());
-                } catch (UnknownHostException e) {
-                    throw new IllegalStateException(
-                                                    "Cannot determine local loopback address",
-                                                    e);
-                }
-            } else {
-                NetworkInterface iface = NetworkInterface.getByName(networkInterface);
-                if (iface == null) {
-                    throw new IllegalArgumentException(
-                                                       String.format("Cannot find network interface: %s ",
-                                                                     networkInterface));
-                }
-                InetAddress interfaceAddress = null;
-                interfaceAddress = getAddress(iface);
-                InetSocketAddress endpoint = new InetSocketAddress(
-                                                                   interfaceAddress,
-                                                                   bound.getPort());
-                bound = endpoint;
-            }
-        }
         localAddress = bound;
         try {
             socket.setReceiveBufferSize(MAX_SEG_SIZE * receiveBufferMultiplier);
@@ -274,23 +244,23 @@ public class UdpCommunications implements GossipCommunications {
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor) throws SocketException {
         this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, defaultMac(), null);
+             DEFAULT_SEND_BUFFER_MULTIPLIER, defaultMac());
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor,
                              int receiveBufferMultiplier,
-                             int sendBufferMultiplier, Mac mac,
-                             String networkInterface) throws SocketException {
+                             int sendBufferMultiplier, Mac mac)
+                                                               throws SocketException {
         this(connect(endpoint), executor, receiveBufferMultiplier,
-             sendBufferMultiplier, mac, networkInterface);
+             sendBufferMultiplier, mac);
     }
 
     public UdpCommunications(InetSocketAddress endpoint,
                              ExecutorService executor, Mac mac)
                                                                throws SocketException {
         this(endpoint, executor, DEFAULT_RECEIVE_BUFFER_MULTIPLIER,
-             DEFAULT_SEND_BUFFER_MULTIPLIER, mac, null);
+             DEFAULT_SEND_BUFFER_MULTIPLIER, mac);
     }
 
     @Override
@@ -402,21 +372,6 @@ public class UdpCommunications implements GossipCommunications {
             digests[i] = digest;
         }
         return digests;
-    }
-
-    private InetAddress getAddress(NetworkInterface iface) {
-        InetAddress interfaceAddress = null;
-        for (InterfaceAddress address : iface.getInterfaceAddresses()) {
-            if (address.getAddress().getAddress().length == 4) {
-                interfaceAddress = address.getAddress();
-            }
-        }
-        if (interfaceAddress == null) {
-            throw new IllegalStateException(
-                                            String.format("Unable ot determine bound ip4 address for interface '%s'",
-                                                          iface));
-        }
-        return interfaceAddress;
     }
 
     private void handleGossip(final InetSocketAddress gossiper, ByteBuffer msg) {
@@ -571,8 +526,7 @@ public class UdpCommunications implements GossipCommunications {
         final DatagramPacket packet = new DatagramPacket(buffer.array(),
                                                          buffer.array().length);
         if (log.isTraceEnabled()) {
-            log.trace(String.format("listening for packet on %s",
-                                    socket.getLocalSocketAddress()));
+            log.trace(String.format("listening for packet on %s", localAddress));
         }
         socket.receive(packet);
         buffer.limit(packet.getLength());

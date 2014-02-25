@@ -1,6 +1,6 @@
 cleanupCycles: 5
 commThreads: 10
-endpoint: :0
+endpoint: localhost:0
 gossipInterval: 3
 gossipUnit: SECONDS
 heartbeatCycle: 2
