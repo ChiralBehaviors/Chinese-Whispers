@@ -20,9 +20,7 @@ import static com.hellblazer.gossip.Gossip.DEFAULT_CLEANUP_CYCLES;
 import static com.hellblazer.gossip.Gossip.DEFAULT_HEARTBEAT_CYCLE;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.security.InvalidKeyException;
@@ -46,6 +44,7 @@ import com.hellblazer.gossip.Gossip;
 import com.hellblazer.gossip.SystemView;
 import com.hellblazer.gossip.UdpCommunications;
 import com.hellblazer.utils.Base64Coder;
+import com.hellblazer.utils.Utils;
 import com.hellblazer.utils.fd.FailureDetectorFactory;
 import com.hellblazer.utils.fd.impl.AdaptiveFailureDetectorFactory;
 
@@ -125,7 +124,7 @@ public class GossipConfiguration {
                 }
                 log.warn(String.format("Supplied ANY address for endpoint: %s with no networkInterface defined, using %s",
                                        endpoint, iface));
-                return new InetSocketAddress(getAddress(iface),
+                return new InetSocketAddress(Utils.getAddress(iface),
                                              endpoint.getPort());
             } else {
                 NetworkInterface iface = NetworkInterface.getByName(networkInterface);
@@ -136,7 +135,7 @@ public class GossipConfiguration {
                                                        String.format("Cannot find network interface: %s ",
                                                                      networkInterface));
                 }
-                return new InetSocketAddress(getAddress(iface),
+                return new InetSocketAddress(Utils.getAddress(iface),
                                              endpoint.getPort());
             }
         }
@@ -179,20 +178,5 @@ public class GossipConfiguration {
                                                           hmacKey, hmac));
         }
         return mac;
-    }
-
-    private InetAddress getAddress(NetworkInterface iface) {
-        InetAddress interfaceAddress = null;
-        for (InterfaceAddress address : iface.getInterfaceAddresses()) {
-            if (address.getAddress().getAddress().length == 4) {
-                interfaceAddress = address.getAddress();
-            }
-        }
-        if (interfaceAddress == null) {
-            throw new IllegalStateException(
-                                            String.format("Unable ot determine bound ip4 address for interface '%s'",
-                                                          iface));
-        }
-        return interfaceAddress;
     }
 }
