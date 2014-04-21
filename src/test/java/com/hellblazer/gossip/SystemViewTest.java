@@ -139,7 +139,7 @@ public class SystemViewTest extends TestCase {
         SystemView view = new SystemView(random, local, seedHosts,
                                          quarantineDelay, unreachableDelay);
         assertNull(view.getRandomSeedMember(Arrays.asList(seed1)));
-        assertEquals(seed1, view.getRandomSeedMember(Arrays.asList(local)));
+        assertEquals(seed3, view.getRandomSeedMember(Arrays.asList(local)));
 
         view.markAlive(live1);
         view.markAlive(live2);
@@ -158,7 +158,7 @@ public class SystemViewTest extends TestCase {
 
         when(random.nextDouble()).thenReturn(0.75, 0.45, 0.0);
 
-        assertEquals(seed1, view.getRandomSeedMember(Arrays.asList(local)));
+        assertEquals(seed3, view.getRandomSeedMember(Arrays.asList(local)));
 
         view.markAlive(live4);
         view.markAlive(live5);
