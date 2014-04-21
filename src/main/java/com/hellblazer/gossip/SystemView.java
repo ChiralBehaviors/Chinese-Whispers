@@ -17,18 +17,17 @@ package com.hellblazer.gossip;
 import static java.lang.String.format;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.hellblazer.utils.collections.OaHashSet;
 
 /**
  * Provides a view on the known endpoint state for the system. The primary
@@ -53,7 +52,7 @@ public class SystemView {
     private final InetSocketAddress            localAddress;
     private final Map<InetSocketAddress, Long> quarantined = new HashMap<InetSocketAddress, Long>();
     private final long                         quarantineInterval;
-    private final Set<InetSocketAddress>       seeds       = new OaHashSet<InetSocketAddress>();
+    private final List<InetSocketAddress>      seeds       = new ArrayList<InetSocketAddress>();
     private final Map<InetSocketAddress, Long> unreachable = new HashMap<InetSocketAddress, Long>();
     private final long                         unreachableInterval;
 
@@ -74,8 +73,8 @@ public class SystemView {
      *            member really and truly dead
      */
     public SystemView(Random random, InetSocketAddress localAddress,
-                      Collection<InetSocketAddress> seedHosts,
-                      long quarantineDelay, long unreachableDelay) {
+                      List<InetSocketAddress> seedHosts, long quarantineDelay,
+                      long unreachableDelay) {
         assert validAddresses(seedHosts);
         entropy = random;
         this.localAddress = localAddress;
@@ -168,7 +167,7 @@ public class SystemView {
             }
             i++;
         }
-        log.info(format("We should have found the selected random member of the supplied endpoint set: %s",
+        log.warn(format("We should have found the selected random member of the supplied endpoint set: %s",
                         index));
         return null;
     }
@@ -182,14 +181,14 @@ public class SystemView {
      * unreachable endpoint sets
      * 
      * @param member
-     *            - the member that has been gossiped with
+     *            - the members that have been gossiped with
+     * 
      * @return a random member of the seed set, if appropriate, or null
      */
-    public synchronized InetSocketAddress getRandomSeedMember(InetSocketAddress member,
-                                                              double liveSetSize) {
-        if (member == null) {
+    public synchronized InetSocketAddress getRandomSeedMember(List<InetSocketAddress> members) {
+        if (members.isEmpty()) {
             return getRandomMember(seeds);
-        } else if (seeds.contains(member)) {
+        } else if (seeds.containsAll(members)) {
             return null;
         }
         if (seeds.size() == 0 || seeds.size() == 1
@@ -198,15 +197,13 @@ public class SystemView {
         }
 
         InetSocketAddress seed = null;
+        int attempts = 0;
         do {
-            if (liveSetSize == 0.0) {
-                seed = getRandomMember(seeds);
+            if (attempts++ > seeds.size()) {
+                return null;
             }
-            if (entropy.nextDouble() <= seeds.size()
-                                        / (liveSetSize + unreachable.size())) {
-                seed = getRandomMember(seeds);
-            }
-        } while (localAddress.equals(seed));
+            seed = getRandomMember(seeds);
+        } while (localAddress.equals(seed) || members.contains(seed));
         return seed;
     }
 

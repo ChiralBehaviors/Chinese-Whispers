@@ -20,7 +20,6 @@ import static org.mockito.Mockito.when;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 
@@ -49,8 +48,8 @@ public class SystemViewTest extends TestCase {
         InetSocketAddress live2 = new InetSocketAddress("127.0.0.1", 11);
         InetSocketAddress live3 = new InetSocketAddress("127.0.0.1", 12);
 
-        Collection<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2,
-                                                                seed3, seed4);
+        List<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2, seed3,
+                                                          seed4);
         int quarantineDelay = 30;
         int unreachableDelay = 400;
         SystemView view = new SystemView(random, local, seedHosts,
@@ -87,8 +86,8 @@ public class SystemViewTest extends TestCase {
         InetSocketAddress live7 = new InetSocketAddress("127.0.0.1", 23);
         InetSocketAddress live8 = new InetSocketAddress("127.0.0.1", 24);
 
-        Collection<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2,
-                                                                seed3, seed4);
+        List<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2, seed3,
+                                                          seed4);
         int quarantineDelay = 30;
         int unreachableDelay = 400;
         SystemView view = new SystemView(random, local, seedHosts,
@@ -133,14 +132,14 @@ public class SystemViewTest extends TestCase {
         InetSocketAddress unreachable4 = new InetSocketAddress("127.0.0.1", 16);
         InetSocketAddress unreachable5 = new InetSocketAddress("127.0.0.1", 17);
 
-        Collection<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2,
-                                                                seed3, seed4);
+        List<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2, seed3,
+                                                          seed4);
         int quarantineDelay = 30;
         int unreachableDelay = 400;
         SystemView view = new SystemView(random, local, seedHosts,
                                          quarantineDelay, unreachableDelay);
-        assertNull(view.getRandomSeedMember(seed1, 0));
-        assertEquals(seed1, view.getRandomSeedMember(local, 0));
+        assertNull(view.getRandomSeedMember(Arrays.asList(seed1)));
+        assertEquals(seed1, view.getRandomSeedMember(Arrays.asList(local)));
 
         view.markAlive(live1);
         view.markAlive(live2);
@@ -159,12 +158,11 @@ public class SystemViewTest extends TestCase {
 
         when(random.nextDouble()).thenReturn(0.75, 0.45, 0.0);
 
-        assertNull(view.getRandomSeedMember(local, 3));
-        assertEquals(seed1, view.getRandomSeedMember(local, 3));
+        assertEquals(seed1, view.getRandomSeedMember(Arrays.asList(local)));
 
         view.markAlive(live4);
         view.markAlive(live5);
-        assertNotNull(view.getRandomSeedMember(local, 3));
+        assertNotNull(view.getRandomSeedMember(Arrays.asList(local)));
     }
 
     public void testUnreachableMembers() throws Exception {
@@ -191,8 +189,8 @@ public class SystemViewTest extends TestCase {
         InetSocketAddress unreachable3 = new InetSocketAddress("127.0.0.1", 15);
         InetSocketAddress unreachable4 = new InetSocketAddress("127.0.0.1", 16);
 
-        Collection<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2,
-                                                                seed3, seed4);
+        List<InetSocketAddress> seedHosts = Arrays.asList(seed1, seed2, seed3,
+                                                          seed4);
         int quarantineDelay = 30;
         int unreachableDelay = 400;
         SystemView view = new SystemView(random, local, seedHosts,

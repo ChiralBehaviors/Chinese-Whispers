@@ -83,6 +83,7 @@ public class Gossip {
                                                                                                 1L);
     public static final int                                  DEFAULT_CLEANUP_CYCLES  = 4;
     public static final int                                  DEFAULT_HEARTBEAT_CYCLE = 1;
+    public static final int                                  DEFAULT_REDUNDANCY      = 3;
     public final static Logger                               log                     = LoggerFactory.getLogger(Gossip.class);
     private static final byte[]                              EMPTY_STATE             = new byte[0];
 
@@ -100,6 +101,7 @@ public class Gossip {
     private final TimeUnit                                   intervalUnit;
     private final AtomicReference<GossipListener>            listener                = new AtomicReference<GossipListener>();
     private final Map<UUID, ReplicatedState>                 localState              = new HashMap<UUID, ReplicatedState>();
+    private final int                                        redundancy;
     private final Ring                                       ring;
     private final AtomicBoolean                              running                 = new AtomicBoolean();
     private final ScheduledExecutorService                   scheduler;
@@ -124,7 +126,8 @@ public class Gossip {
                   int gossipInterval, TimeUnit unit) {
         this(Generators.timeBasedGenerator(), communicationsService,
              systemView, failureDetectorFactory, random, gossipInterval, unit,
-             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE,
+             DEFAULT_REDUNDANCY);
     }
 
     /**
@@ -149,7 +152,8 @@ public class Gossip {
                   int gossipInterval, TimeUnit unit, int cleanupCycles) {
         this(Generators.timeBasedGenerator(), communicationsService,
              systemView, failureDetectorFactory, random, gossipInterval, unit,
-             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE,
+             DEFAULT_REDUNDANCY);
     }
 
     /**
@@ -174,7 +178,8 @@ public class Gossip {
                   int gossipInterval, TimeUnit unit) {
         this(idGenerator, communicationsService, systemView,
              failureDetectorFactory, random, gossipInterval, unit,
-             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE);
+             DEFAULT_CLEANUP_CYCLES, DEFAULT_HEARTBEAT_CYCLE,
+             DEFAULT_REDUNDANCY);
     }
 
     /**
@@ -196,13 +201,15 @@ public class Gossip {
      *            endpoint
      * @param heartbeatCycle
      *            = the number of gossip cycles per heartbeat
+     * @param redundancy
+     *            - the number of members to contact each gossip cycle
      */
     public Gossip(NoArgGenerator idGenerator,
                   GossipCommunications communicationsService,
                   SystemView systemView,
                   FailureDetectorFactory failureDetectorFactory, Random random,
                   int gossipInterval, TimeUnit unit, int cleanupCycles,
-                  int heartbeatCycle) {
+                  int heartbeatCycle, int redundancy) {
         this.idGenerator = idGenerator;
         communications = communicationsService;
         communications.setGossip(this);
@@ -214,6 +221,7 @@ public class Gossip {
         ring = new Ring(getLocalAddress(), communications);
         this.cleanupCycles = cleanupCycles;
         this.heartbeatCycle = heartbeatCycle;
+        this.redundancy = redundancy;
         scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -746,9 +754,12 @@ public class Gossip {
     protected void gossip() {
         updateHeartbeat();
         List<Digest> digests = randomDigests();
-        InetSocketAddress member = gossipWithTheLiving(digests);
+        List<InetSocketAddress> members = new ArrayList<>();
+        for (int i = 0; i < redundancy; i++) {
+            members.add(gossipWithTheLiving(digests));
+        }
         gossipWithTheDead(digests);
-        gossipWithSeeds(digests, member);
+        gossipWithSeeds(digests, members);
         checkStatus();
     }
 
@@ -791,13 +802,12 @@ public class Gossip {
      * 
      * @param digests
      *            - the digests to gossip.
-     * @param member
+     * @param members
      *            - the live member we've gossiped with.
      */
     protected void gossipWithSeeds(final List<Digest> digests,
-                                   InetSocketAddress member) {
-        InetSocketAddress address = view.getRandomSeedMember(member,
-                                                             endpoints.size());
+                                   List<InetSocketAddress> members) {
+        InetSocketAddress address = view.getRandomSeedMember(members);
         if (address == null) {
             return;
         }

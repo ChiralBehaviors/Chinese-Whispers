@@ -25,7 +25,6 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -70,20 +69,21 @@ public class GossipConfiguration {
     public String                  hmacKey;
     public String                  networkInterface;
     public long                    quarantineDelay         = TimeUnit.SECONDS.toMillis(30);
+    public int                     redundancy              = 3;
     public int                     receiveBufferMultiplier = UdpCommunications.DEFAULT_RECEIVE_BUFFER_MULTIPLIER;
     public List<InetSocketAddress> seeds                   = Collections.emptyList();
     public int                     sendBufferMultiplier    = UdpCommunications.DEFAULT_SEND_BUFFER_MULTIPLIER;
     public long                    unreachableDelay        = (int) TimeUnit.DAYS.toMillis(2);
 
     public Gossip construct() throws SocketException {
-        Random entropy = new SecureRandom();
+        Random entropy = new Random();
         UdpCommunications comms = constructUdpComms();
         SystemView view = new SystemView(entropy, comms.getLocalAddress(),
                                          seeds, quarantineDelay,
                                          unreachableDelay);
         return new Gossip(Generators.timeBasedGenerator(), comms, view,
                           getFdFactory(), entropy, gossipInterval, gossipUnit,
-                          cleanupCycles, heartbeatCycle);
+                          cleanupCycles, heartbeatCycle, redundancy);
     }
 
     public UdpCommunications constructUdpComms() throws SocketException {

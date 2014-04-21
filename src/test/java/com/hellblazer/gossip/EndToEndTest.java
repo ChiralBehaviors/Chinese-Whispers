@@ -68,7 +68,7 @@ public class EndToEndTest extends TestCase {
             int currentCount = count.incrementAndGet();
             if (currentCount % 10 == 0) {
                 System.out.print('.');
-            } else if (currentCount % 100 == 0) {
+            } else if (currentCount % 20 == 0) {
                 System.out.println();
             }
 
@@ -83,7 +83,7 @@ public class EndToEndTest extends TestCase {
             int currentCount = count.incrementAndGet();
             if (currentCount % 10 == 0) {
                 System.out.print('.');
-            } else if (currentCount % 100 == 0) {
+            } else if (currentCount % 20 == 0) {
                 System.out.println();
             }
 
@@ -108,8 +108,8 @@ public class EndToEndTest extends TestCase {
     private List<Gossip>               members;
 
     public void testEnd2End() throws Exception {
-        int membership = 16;
-        int maxSeeds = 1;
+        int membership = 32;
+        int maxSeeds = 2;
         Random entropy = new Random(0x1638);
         stateIds = new UUID[membership];
 
@@ -144,7 +144,7 @@ public class EndToEndTest extends TestCase {
             for (int i = 0; i < membership; i++) {
                 assertTrue(String.format("initial iteration did not receive all notifications for %s",
                                          members.get(i)),
-                           receivers[i].await(30, TimeUnit.SECONDS));
+                           receivers[i].await(60, TimeUnit.SECONDS));
             }
             System.out.println();
             System.out.println("Initial iteration completed");
@@ -167,6 +167,7 @@ public class EndToEndTest extends TestCase {
                                                  int i) throws SocketException {
         GossipConfiguration config = new GossipConfiguration();
         config.seeds = seedHosts;
+        config.gossipInterval = 1;
         Gossip gossip = config.construct();
         gossip.setListener(receiver);
         return gossip;
