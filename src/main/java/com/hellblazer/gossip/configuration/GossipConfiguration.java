@@ -118,22 +118,22 @@ public class GossipConfiguration {
             if (networkInterface == null) {
                 NetworkInterface iface = NetworkInterface.getByIndex(1);
                 if (iface == null) {
-                    log.error("Supplied ANY address for endpoint: %s with no networkInterface defined, cannot find network interface 1");
-                    throw new IllegalArgumentException(
-                                                       "Supplied ANY address for endpoint: %s with no networkInterface defined, cannot find network interface 1 ");
+                    String msg = String.format("Supplied ANY address for endpoint: %s with no networkInterface defined, cannot find network interface 1",
+                                               endpoint);
+                    log.error(msg);
+                    throw new IllegalArgumentException(msg);
                 }
-                log.warn(String.format("Supplied ANY address for endpoint: %s with no networkInterface defined, using %s",
+                log.info(String.format("Supplied ANY address for endpoint: %s with no networkInterface defined, using %s",
                                        endpoint, iface));
                 return new InetSocketAddress(Utils.getAddress(iface),
                                              endpoint.getPort());
             } else {
                 NetworkInterface iface = NetworkInterface.getByName(networkInterface);
                 if (iface == null) {
-                    log.error(String.format("Cannot find network interface: %s ",
-                                            networkInterface));
-                    throw new IllegalArgumentException(
-                                                       String.format("Cannot find network interface: %s ",
-                                                                     networkInterface));
+                    String msg = String.format("Cannot find network interface: %s ",
+                                               networkInterface);
+                    log.error(msg);
+                    throw new IllegalArgumentException(msg);
                 }
                 return new InetSocketAddress(Utils.getAddress(iface),
                                              endpoint.getPort());
