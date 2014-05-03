@@ -15,8 +15,7 @@ seeds:
     - localhost:666
     - localhost:668
 
-fdFactory:
-    type: adaptiveFailureDetectorFactory
+fdFactory: !adaptiveFailureDetectorFactory
     convictionThreshold: 0.9
     windowSize: 100
     scale: 0.8
