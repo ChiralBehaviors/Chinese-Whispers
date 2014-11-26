@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.hellblazer</groupId>
 	<artifactId>chinese-whispers</artifactId>
-	<version>1.0.2-SNAPSHOT</version>
+	<version>1.0.2</version>
 	<name>Chinese Whispers</name>
 	<description>A UDP based state replication service</description>
 
@@ -18,19 +18,30 @@
 		<developer>
 			<name>Hal Hildebrand</name>
 			<email>hal.hildebrand@me.com</email>
-			<organization>Hellbound Productions</organization>
+			<organization>Chiral Behaviors</organization>
 		</developer>
 	</developers>
 
 	<scm>
-		<connection>git://github.com/Hellblazer/Chinese-Whispers.git</connection>
-		<url>https://github.com/Hellblazer/Chinese-Whispers</url>
+		<connection>git://github.com/ChiralBehaviors/Chinese-Whispers.git</connection>
+		<url>https://github.com/ChiralBehaviors/Chinese-Whispers</url>
 	</scm>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.resources.sourceEncoding>UTF-8</project.resources.sourceEncoding>
 	</properties>
+
+    <repositories>
+        <repository>
+            <id>ChiralBehaviors-Snapshots</id>
+            <url>http://repository-chiralbehaviors.forge.cloudbees.com/snapshot/</url>
+        </repository>
+        <repository>
+            <id>ChiralBehaviors-release</id>
+            <url>http://repository-chiralbehaviors.forge.cloudbees.com/release/</url>
+        </repository>
+    </repositories>
 
 	<dependencies>
 		<dependency>
@@ -88,20 +99,9 @@
 		<dependency>
 			<groupId>com.chiralbehaviors</groupId>
 			<artifactId>failure-detectors</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.0.1</version>
 		</dependency>
 	</dependencies>
-
-	<repositories>
-		<repository>
-			<id>hellblazer-snapshots</id>
-			<url>https://repository-hal900000.forge.cloudbees.com/snapshot/</url>
-		</repository>
-		<repository>
-			<id>hellblazer-release</id>
-			<url>https://repository-hal900000.forge.cloudbees.com/release/</url>
-		</repository>
-	</repositories>
 
 	<build>
 		<plugins>
